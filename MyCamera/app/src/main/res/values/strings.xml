@@ -1,0 +1,32 @@
+<resources>
+    <string name="app_name">AstroNight Camera</string>
+    <string name="mode_astro">Astro</string>
+    <string name="mode_night">Notte</string>
+    <string name="mode_pro">Manuale</string>
+    <string name="mode_auto">Auto</string>
+    
+    <string name="label_shutter">Esposizione</string>
+    <string name="label_iso">ISO</string>
+    <string name="label_focus">Fuoco</string>
+    <string name="label_ev">EV</string>
+    <string name="label_infinity">Infinito (∞)</string>
+    <string name="label_auto_short">Auto</string>
+    
+    <string name="timer_off">Timer Off</string>
+    <string name="timer_2s">2s</string>
+    <string name="timer_5s">5s</string>
+    <string name="timer_10s">10s</string>
+    
+    <string name="noise_reduction_title">Riduzione Rumore</string>
+    <string name="nr_high_quality">Qualità Alta</string>
+    <string name="nr_minimal">Minima (Stelle Nitide)</string>
+    <string name="nr_off">Disattivata</string>
+    
+    <string name="capturing">Scatto in corso…</string>
+    <string name="exposure_progress">Esposizione aperta (%1$d / %2$ds)</string>
+    <string name="processing">Elaborazione e salvataggio…</string>
+    <string name="photo_saved">Foto salvata nella Galleria!</string>
+    <string name="camera_permission_required">È richiesto il permesso della fotocamera per scattare foto.</string>
+    <string name="tripod_recommendation">Consiglio: Usa un treppiede per esposizioni superiori a 1 secondo!</string>
+    <string name="astro_tips">Modalità Astro attiva: Fuoco impostato su Infinito, ISO 1600, autoscatto 3s.</string>
+</resources>

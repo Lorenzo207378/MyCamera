@@ -1,0 +1,162 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Starlight Beam from Objective Lens -->
+    <path
+        android:pathData="M64,30 L88,6 L94,12 L70,36 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="67"
+                android:startY="33"
+                android:endX="91"
+                android:endY="9"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#9900E5FF" />
+                <item android:offset="0.6" android:color="#4400E5FF" />
+                <item android:offset="1.0" android:color="#0000E5FF" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Tripod Legs (Behind mount) -->
+    <!-- Left Leg -->
+    <path
+        android:strokeColor="#78909C"
+        android:strokeWidth="3.2"
+        android:strokeLineCap="round"
+        android:pathData="M52,66 L30,96" />
+    <path
+        android:strokeColor="#B0BEC5"
+        android:strokeWidth="1.2"
+        android:strokeLineCap="round"
+        android:pathData="M52,66 L30,96" />
+
+    <!-- Center Leg -->
+    <path
+        android:strokeColor="#607D8B"
+        android:strokeWidth="3.5"
+        android:strokeLineCap="round"
+        android:pathData="M52,66 L52,98" />
+    <path
+        android:strokeColor="#90A4AE"
+        android:strokeWidth="1.4"
+        android:strokeLineCap="round"
+        android:pathData="M52,66 L52,98" />
+
+    <!-- Right Leg -->
+    <path
+        android:strokeColor="#78909C"
+        android:strokeWidth="3.2"
+        android:strokeLineCap="round"
+        android:pathData="M52,66 L74,96" />
+    <path
+        android:strokeColor="#B0BEC5"
+        android:strokeWidth="1.2"
+        android:strokeLineCap="round"
+        android:pathData="M52,66 L74,96" />
+
+    <!-- Tripod Leg Feet / Spikes -->
+    <path android:fillColor="#37474F" android:pathData="M28,95 L32,95 L30,98 Z" />
+    <path android:fillColor="#37474F" android:pathData="M50,97 L54,97 L52,100 Z" />
+    <path android:fillColor="#37474F" android:pathData="M72,95 L76,95 L74,98 Z" />
+
+    <!-- Tripod Spreader / Accessory Tray -->
+    <path
+        android:strokeColor="#455A64"
+        android:strokeWidth="1.6"
+        android:pathData="M38,82 L66,82" />
+
+    <!-- Tripod Central Hub / Base Collar -->
+    <path
+        android:fillColor="#37474F"
+        android:pathData="M48,63 L56,63 L55,68 L49,68 Z" />
+
+    <!-- Equatorial Mount Head & Altitude Axis -->
+    <path
+        android:fillColor="#455A64"
+        android:pathData="M49,57 L55,57 L56,63 L48,63 Z" />
+    <path
+        android:fillColor="#00E5FF"
+        android:pathData="M50,56 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0" />
+
+    <!-- Counterweight Shaft and Weight -->
+    <path
+        android:strokeColor="#90A4AE"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="round"
+        android:pathData="M52,58 L41,69" />
+    <!-- Counterweight Disc -->
+    <path
+        android:fillColor="#263238"
+        android:strokeColor="#00E5FF"
+        android:strokeWidth="0.8"
+        android:pathData="M41,65 L46,70 L43,73 L38,68 Z" />
+
+    <!-- Telescope Tube Main Body (Angle ~ 45 degrees towards upper-right) -->
+    <!-- Dew Shield / Objective Front Rim -->
+    <path
+        android:fillColor="#00B4D8"
+        android:pathData="M64,28 L72,36 L69,39 L61,31 Z" />
+    <path
+        android:fillColor="#00E5FF"
+        android:pathData="M66,26 L74,34 L72,36 L64,28 Z" />
+
+    <!-- Main Optical Tube (White / High contrast with cyan accents) -->
+    <path
+        android:fillColor="#ECEFF1"
+        android:pathData="M44,48 L62,30 L67,35 L49,53 Z" />
+
+    <!-- Optical Tube Shading / Depth -->
+    <path
+        android:fillColor="#CFD8DC"
+        android:pathData="M46,50 L64,32 L67,35 L49,53 Z" />
+
+    <!-- Cyan Accent Decorative Ring on Tube -->
+    <path
+        android:fillColor="#00E5FF"
+        android:pathData="M52,40 L55,37 L57,39 L54,42 Z" />
+
+    <!-- Telescope Finder Scope (Smaller parallel scope on top) -->
+    <path
+        android:strokeColor="#78909C"
+        android:strokeWidth="1.2"
+        android:pathData="M49,38 L48,36 M57,30 L56,28" />
+    <path
+        android:fillColor="#37474F"
+        android:pathData="M46,34 L59,21 L61,23 L48,36 Z" />
+    <path
+        android:fillColor="#00E5FF"
+        android:pathData="M59,21 L62,24 L61,25 L58,22 Z" />
+
+    <!-- Eyepiece / Star Diagonal (At the rear end) -->
+    <!-- Focuser Drawtube -->
+    <path
+        android:fillColor="#78909C"
+        android:pathData="M41,51 L44,48 L46,50 L43,53 Z" />
+    <!-- 90-degree Star Diagonal prism -->
+    <path
+        android:fillColor="#263238"
+        android:pathData="M37,55 L42,50 L40,48 L35,53 Z" />
+    <!-- Eyepiece Tube pointing up-left -->
+    <path
+        android:fillColor="#455A64"
+        android:pathData="M37,51 L33,47 L35,45 L39,49 Z" />
+    <path
+        android:fillColor="#00E5FF"
+        android:pathData="M32,46 L34,44 L36,46 L34,48 Z" />
+
+    <!-- Focusing Knob -->
+    <path
+        android:fillColor="#FFB74D"
+        android:pathData="M42,54 a1.5,1.5 0 1,0 3,0 a1.5,1.5 0 1,0 -3,0" />
+
+    <!-- Sparkle on Telescope Lens (Bright Star Reflection) -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M69,31 Q69,27 69,27 Q69,31 73,31 Q69,31 69,35 Q69,31 65,31 Q69,31 69,27 Z" />
+
+</vector>

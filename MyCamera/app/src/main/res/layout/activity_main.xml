@@ -1,0 +1,578 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/main"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/black"
+    tools:context=".MainActivity">
+
+    <!-- Camera Viewfinder Container -->
+    <FrameLayout
+        android:id="@+id/cameraContainer"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="@color/black"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <com.example.mycamera.AutoFitTextureView
+            android:id="@+id/textureView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center" />
+
+        <com.example.mycamera.CameraOverlayView
+            android:id="@+id/overlayView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+    </FrameLayout>
+
+    <!-- Top Action Bar for Quick Settings -->
+    <LinearLayout
+        android:id="@+id/topBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="16dp"
+        android:paddingTop="36dp"
+        android:paddingBottom="12dp"
+        android:background="@drawable/bg_panel_rounded"
+        android:rotation="180"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <!-- Unrotate child layout so items display right side up with top curved background -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:rotation="180">
+
+            <!-- Flash Button -->
+            <ImageButton
+                android:id="@+id/btnFlash"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_flash_off"
+                android:contentDescription="Flash / Torcia"
+                app:tint="@color/white" />
+
+            <!-- Timer Button -->
+            <FrameLayout
+                android:id="@+id/btnTimerContainer"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp">
+
+                <ImageButton
+                    android:id="@+id/btnTimer"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:src="@drawable/ic_timer"
+                    android:contentDescription="Autoscatto"
+                    app:tint="@color/white" />
+
+                <TextView
+                    android:id="@+id/tvTimerBadge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="bottom|end"
+                    android:text=""
+                    android:textSize="10sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/astro_cyan"
+                    android:visibility="gone" />
+            </FrameLayout>
+
+            <!-- Grid & Horizon Toggle -->
+            <ImageButton
+                android:id="@+id/btnGrid"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_marginStart="8dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_grid"
+                android:contentDescription="Griglia e Livella"
+                app:tint="@color/white" />
+
+            <!-- Stacking Mode (Deep Sky vs Star Trails) -->
+            <TextView
+                android:id="@+id/btnStackMode"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/bg_chip_unselected"
+                android:gravity="center"
+                android:paddingHorizontal="10dp"
+                android:text="🌌 Deep Sky"
+                android:textColor="@color/astro_cyan"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
+
+            <!-- Switch Camera Button -->
+            <ImageButton
+                android:id="@+id/btnSwitchCamera"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_switch_camera"
+                android:contentDescription="Cambia Fotocamera"
+                app:tint="@color/white" />
+
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Real-time HUD Parameters Pill -->
+    <LinearLayout
+        android:id="@+id/hudPill"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/bg_hud_pill"
+        android:orientation="horizontal"
+        android:paddingHorizontal="14dp"
+        android:paddingVertical="6dp"
+        app:layout_constraintTop_toBottomOf="@id/topBar"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <TextView
+            android:id="@+id/hudShutter"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="⏱ Auto"
+            android:textColor="@color/astro_cyan"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="6dp"
+            android:text="|"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/hudIso"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="ISO Auto"
+            android:textColor="@color/astro_amber"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="6dp"
+            android:text="|"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/hudFocus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🎯 AF"
+            android:textColor="@color/white"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+    </LinearLayout>
+
+    <!-- Tips Banner for Astrophotography -->
+    <TextView
+        android:id="@+id/tvTipBanner"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="24dp"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/bg_hud_pill"
+        android:paddingHorizontal="12dp"
+        android:paddingVertical="6dp"
+        android:gravity="center"
+        android:text="🌌 Modalità Astro: Fuoco Infinito (∞) • Treppiede consigliato"
+        android:textColor="@color/astro_cyan"
+        android:textSize="11sp"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/hudPill"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- Manual Controls Panel (Expandable / Tabbed) -->
+    <androidx.cardview.widget.CardView
+        android:id="@+id/panelManualControls"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="12dp"
+        android:layout_marginBottom="8dp"
+        app:cardBackgroundColor="@color/bg_panel_overlay"
+        app:cardCornerRadius="18dp"
+        app:cardElevation="6dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@id/modeChipsScroll">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="12dp">
+
+            <!-- Sub-Tabs: [ Esposizione | ISO | Fuoco | EV ] -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center">
+
+                <TextView
+                    android:id="@+id/tabShutter"
+                    android:layout_width="0dp"
+                    android:layout_height="34dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="4dp"
+                    android:background="@drawable/bg_chip_selected"
+                    android:gravity="center"
+                    android:text="Esposizione"
+                    android:textColor="@color/black"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tabIso"
+                    android:layout_width="0dp"
+                    android:layout_height="34dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="4dp"
+                    android:background="@drawable/bg_chip_unselected"
+                    android:gravity="center"
+                    android:text="ISO"
+                    android:textColor="@color/white"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tabFocus"
+                    android:layout_width="0dp"
+                    android:layout_height="34dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="4dp"
+                    android:background="@drawable/bg_chip_unselected"
+                    android:gravity="center"
+                    android:text="Fuoco"
+                    android:textColor="@color/white"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tabEv"
+                    android:layout_width="0dp"
+                    android:layout_height="34dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_chip_unselected"
+                    android:gravity="center"
+                    android:text="EV"
+                    android:textColor="@color/white"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <!-- Active Parameter Value Display -->
+            <TextView
+                android:id="@+id/tvParamValue"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:gravity="center"
+                android:text="Tempo di Esposizione: Auto"
+                android:textColor="@color/astro_cyan"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <!-- Slider Control -->
+            <com.google.android.material.slider.Slider
+                android:id="@+id/sliderParam"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:valueFrom="0"
+                android:valueTo="18"
+                android:stepSize="1"
+                app:thumbColor="@color/astro_cyan"
+                app:trackColorActive="@color/astro_cyan"
+                app:trackColorInactive="@color/slider_track_inactive" />
+
+            <!-- Horizontal Quick Selection Chips -->
+            <HorizontalScrollView
+                android:id="@+id/quickChipsScroll"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:scrollbars="none"
+                android:layout_marginTop="4dp">
+
+                <LinearLayout
+                    android:id="@+id/layoutQuickChips"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal" />
+            </HorizontalScrollView>
+
+        </LinearLayout>
+    </androidx.cardview.widget.CardView>
+
+    <!-- Mode Selector Bar (Astro / Notte / Manuale / Auto) -->
+    <HorizontalScrollView
+        android:id="@+id/modeChipsScroll"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:scrollbars="none"
+        android:paddingHorizontal="16dp"
+        android:layout_marginBottom="12dp"
+        app:layout_constraintBottom_toTopOf="@id/bottomControlsLayout">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <!-- Astro Mode Chip -->
+            <TextView
+                android:id="@+id/chipModeAstro"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/bg_chip_selected"
+                android:gravity="center"
+                android:paddingHorizontal="16dp"
+                android:text="🌌 Astro (Stelle)"
+                android:textColor="@color/black"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <!-- Night Mode Chip -->
+            <TextView
+                android:id="@+id/chipModeNight"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/bg_chip_unselected"
+                android:gravity="center"
+                android:paddingHorizontal="16dp"
+                android:text="🌃 Notte Paesaggio"
+                android:textColor="@color/white"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <!-- Manual Pro Chip -->
+            <TextView
+                android:id="@+id/chipModePro"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/bg_chip_unselected"
+                android:gravity="center"
+                android:paddingHorizontal="16dp"
+                android:text="🛠️ Manuale"
+                android:textColor="@color/white"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <!-- Auto Mode Chip -->
+            <TextView
+                android:id="@+id/chipModeAuto"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:background="@drawable/bg_chip_unselected"
+                android:gravity="center"
+                android:paddingHorizontal="16dp"
+                android:text="🔆 Auto"
+                android:textColor="@color/white"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+        </LinearLayout>
+    </HorizontalScrollView>
+
+    <!-- Bottom Controls (Gallery, Shutter Button, Tune Controls) -->
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/bottomControlsLayout"
+        android:layout_width="match_parent"
+        android:layout_height="100dp"
+        android:paddingBottom="24dp"
+        android:background="@drawable/bg_panel_rounded"
+        app:layout_constraintBottom_toBottomOf="parent">
+
+        <!-- Gallery Thumbnail Preview -->
+        <com.google.android.material.imageview.ShapeableImageView
+            android:id="@+id/ivGalleryThumbnail"
+            android:layout_width="52dp"
+            android:layout_height="52dp"
+            android:layout_marginStart="28dp"
+            android:scaleType="centerCrop"
+            android:src="@drawable/ic_gallery"
+            android:background="#26FFFFFF"
+            android:padding="2dp"
+            app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Full"
+            app:strokeColor="@color/astro_cyan"
+            app:strokeWidth="2dp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent" />
+
+        <!-- Main Shutter Button -->
+        <FrameLayout
+            android:id="@+id/btnShutterContainer"
+            android:layout_width="76dp"
+            android:layout_height="76dp"
+            android:background="@drawable/bg_shutter_outer"
+            android:padding="6dp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent">
+
+            <View
+                android:id="@+id/btnShutterInner"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/bg_shutter_inner" />
+
+            <ImageView
+                android:id="@+id/ivShutterIcon"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_astro_mode"
+                app:tint="@color/black" />
+
+        </FrameLayout>
+
+        <!-- Manual Sliders Toggle Button -->
+        <ImageButton
+            android:id="@+id/btnToggleManualPanel"
+            android:layout_width="52dp"
+            android:layout_height="52dp"
+            android:layout_marginEnd="28dp"
+            android:background="@drawable/bg_chip_unselected"
+            android:src="@drawable/ic_tune"
+            android:contentDescription="Regola Parametri Manuali"
+            app:tint="@color/astro_cyan"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <!-- Long Exposure & Timer Countdown Overlay Screen -->
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/layoutCaptureOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#B3000000"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent">
+
+        <com.google.android.material.progressindicator.CircularProgressIndicator
+            android:id="@+id/captureProgressBar"
+            android:layout_width="120dp"
+            android:layout_height="120dp"
+            android:indeterminate="false"
+            app:indicatorSize="100dp"
+            app:trackThickness="8dp"
+            app:indicatorColor="@color/astro_cyan"
+            app:trackColor="#33FFFFFF"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
+
+        <TextView
+            android:id="@+id/tvCaptureCountdown"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="15s"
+            android:textColor="@color/white"
+            android:textSize="26sp"
+            android:textStyle="bold"
+            app:layout_constraintTop_toTopOf="@id/captureProgressBar"
+            app:layout_constraintBottom_toBottomOf="@id/captureProgressBar"
+            app:layout_constraintStart_toStartOf="@id/captureProgressBar"
+            app:layout_constraintEnd_toEndOf="@id/captureProgressBar" />
+
+        <TextView
+            android:id="@+id/tvCaptureStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="Esposizione astronomica in corso…"
+            android:textColor="@color/astro_cyan"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            app:layout_constraintTop_toBottomOf="@id/captureProgressBar"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
+
+        <TextView
+            android:id="@+id/tvCaptureSubframe"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="Integrazione Frame: 1 / 1"
+            android:textColor="@color/astro_amber"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:visibility="gone"
+            app:layout_constraintTop_toBottomOf="@id/tvCaptureStatus"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
+
+        <TextView
+            android:id="@+id/tvCaptureHint"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="Mantieni il telefono fermo o su treppiede"
+            android:textColor="@color/text_secondary"
+            android:textSize="13sp"
+            app:layout_constraintTop_toBottomOf="@id/tvCaptureSubframe"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
+
+        <!-- Stop and Save Stacked Photo Button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnStopCapture"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:layout_marginTop="24dp"
+            android:text="⏹️ Termina e Salva Foto"
+            android:textColor="@color/black"
+            android:textStyle="bold"
+            android:backgroundTint="@color/astro_cyan"
+            app:cornerRadius="24dp"
+            android:visibility="gone"
+            app:layout_constraintTop_toBottomOf="@id/tvCaptureHint"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

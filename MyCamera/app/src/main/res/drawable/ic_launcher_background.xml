@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Deep Space Sky Gradient -->
+    <path
+        android:pathData="M0,0h108v108h-108z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="54"
+                android:startY="0"
+                android:endX="54"
+                android:endY="108"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#060919" />
+                <item android:offset="0.4" android:color="#0D1B2A" />
+                <item android:offset="0.75" android:color="#1B263B" />
+                <item android:offset="1.0" android:color="#0A1128" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Cosmic Nebula Glow -->
+    <path
+        android:pathData="M15,10 Q54,-5 93,15 Q108,50 90,80 Q50,95 20,75 Q-5,45 15,10 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="54"
+                android:startY="25"
+                android:endX="75"
+                android:endY="75"
+                android:type="radial"
+                android:gradientRadius="48">
+                <item android:offset="0.0" android:color="#3500E5FF" />
+                <item android:offset="0.45" android:color="#207B2CBF" />
+                <item android:offset="1.0" android:color="#00000000" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Distant Small Twinkling Stars -->
+    <!-- Dot Stars -->
+    <path android:fillColor="#88FFFFFF" android:pathData="M18,22 a1,1 0 1,0 2,0 a1,1 0 1,0 -2,0" />
+    <path android:fillColor="#AA00E5FF" android:pathData="M35,14 a1.2,1.2 0 1,0 2.4,0 a1.2,1.2 0 1,0 -2.4,0" />
+    <path android:fillColor="#CCFFFFFF" android:pathData="M78,18 a1.2,1.2 0 1,0 2.4,0 a1.2,1.2 0 1,0 -2.4,0" />
+    <path android:fillColor="#99FFE57F" android:pathData="M92,30 a1,1 0 1,0 2,0 a1,1 0 1,0 -2,0" />
+    <path android:fillColor="#77FFFFFF" android:pathData="M14,48 a0.8,0.8 0 1,0 1.6,0 a0.8,0.8 0 1,0 -1.6,0" />
+    <path android:fillColor="#8800E5FF" android:pathData="M88,62 a1,1 0 1,0 2,0 a1,1 0 1,0 -2,0" />
+    <path android:fillColor="#77FFFFFF" android:pathData="M24,76 a0.8,0.8 0 1,0 1.6,0 a0.8,0.8 0 1,0 -1.6,0" />
+    <path android:fillColor="#66FFFFFF" android:pathData="M80,82 a0.8,0.8 0 1,0 1.6,0 a0.8,0.8 0 1,0 -1.6,0" />
+    <path android:fillColor="#55FFFFFF" android:pathData="M48,8 a0.7,0.7 0 1,0 1.4,0 a0.7,0.7 0 1,0 -1.4,0" />
+    <path android:fillColor="#99FFFFFF" android:pathData="M66,12 a1,1 0 1,0 2,0 a1,1 0 1,0 -2,0" />
+    <path android:fillColor="#66FFFFFF" android:pathData="M10,80 a0.8,0.8 0 1,0 1.6,0 a0.8,0.8 0 1,0 -1.6,0" />
+    <path android:fillColor="#77FFE57F" android:pathData="M96,72 a0.9,0.9 0 1,0 1.8,0 a0.9,0.9 0 1,0 -1.8,0" />
+
+    <!-- Constellation Lines -->
+    <path
+        android:strokeColor="#2200E5FF"
+        android:strokeWidth="0.6"
+        android:pathData="M19,22 L36,14 L56,22 L79,18 L93,30" />
+
+    <!-- Bright 4-Point Sparkling Star #1 (Top Left) -->
+    <path
+        android:fillColor="#E0FFFFFF"
+        android:pathData="M56,22 Q56,17 56,17 Q56,22 61,22 Q56,22 56,27 Q56,22 51,22 Q56,22 56,17 Z" />
+    <path
+        android:fillColor="#6600E5FF"
+        android:pathData="M56,22 a2.5,2.5 0 1,0 5,0 a2.5,2.5 0 1,0 -5,0" />
+
+    <!-- Bright 4-Point Sparkling Star #2 (Top Right Polaris) -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M84,38 Q84,30 84,30 Q84,38 92,38 Q84,38 84,46 Q84,38 76,38 Q84,38 84,30 Z" />
+    <path
+        android:fillColor="#8800E5FF"
+        android:pathData="M84,38 a3.5,3.5 0 1,0 7,0 a3.5,3.5 0 1,0 -7,0" />
+
+    <!-- Bright 4-Point Sparkling Star #3 (Left) -->
+    <path
+        android:fillColor="#FFFFD54F"
+        android:pathData="M22,38 Q22,33 22,33 Q22,38 27,38 Q22,38 22,43 Q22,38 17,38 Q22,38 22,33 Z" />
+
+    <!-- Crescent Moon / Deep Sky Motif (Top Right Corner) -->
+    <path
+        android:fillColor="#33FFE082"
+        android:pathData="M92,12 C88,12 85,15 85,19 C85,23 88,26 92,26 C90,25 89,22 89,19 C89,16 90,13 92,12 Z" />
+
+</vector>
