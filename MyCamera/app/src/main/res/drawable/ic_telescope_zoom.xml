@@ -1,0 +1,29 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Telescope optical tube -->
+    <path
+        android:fillColor="@color/white"
+        android:pathData="M14.5,4.5 L19.5,9.5 L18,11 L13,6 Z" />
+    <path
+        android:fillColor="@color/white"
+        android:pathData="M9,10 L14,15 L12.5,16.5 L7.5,11.5 Z" />
+    <path
+        android:fillColor="@color/white"
+        android:pathData="M5,14 L8.5,17.5 L7,19 L3.5,15.5 Z" />
+    <path
+        android:fillColor="@color/white"
+        android:pathData="M18.5,3.5 L20.5,5.5 L19.5,6.5 L17.5,4.5 Z" />
+    <!-- Tripod / Mount -->
+    <path
+        android:strokeColor="@color/white"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="round"
+        android:pathData="M11,13.5 L7,21.5 M11,13.5 L11,21.5 M11,13.5 L15,21.5" />
+    <!-- Star sparkle in sight -->
+    <path
+        android:fillColor="@color/astro_cyan"
+        android:pathData="M20,2 L20.6,3.4 L22,4 L20.6,4.6 L20,6 L19.4,4.6 L18,4 L19.4,3.4 Z" />
+</vector>

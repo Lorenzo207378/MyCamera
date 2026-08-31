@@ -2,29 +2,37 @@ package com.example.mycamera;
 
 import android.Manifest;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.content.res.ColorStateList;
 import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.CountDownTimer;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Log;
 import android.view.MotionEvent;
+import android.view.ScaleGestureDetector;
 import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.cardview.widget.CardView;
 import androidx.core.content.ContextCompat;
 
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.imageview.ShapeableImageView;
+import com.google.android.material.materialswitch.MaterialSwitch;
 import com.google.android.material.progressindicator.CircularProgressIndicator;
 import com.google.android.material.slider.Slider;
 
@@ -37,17 +45,19 @@ public class MainActivity extends AppCompatActivity implements
         OrientationSensorHelper.OrientationListener {
 
     private enum CameraMode {
-        ASTRO,
-        NIGHT,
-        MANUAL,
-        AUTO
+        PHOTO,         // Simple stock-like camera mode (Default)
+        ASTRO,         // Deep Sky Astrophotography
+        NIGHT,         // Night landscape
+        STAR_TRAILS,   // Continuous star trails integration
+        MANUAL         // Manual / Pro mode
     }
 
     private enum ManualTab {
         SHUTTER,
         ISO,
         FOCUS,
-        EV
+        EV,
+        ZOOM
     }
 
     // UI Elements
@@ -59,27 +69,45 @@ public class MainActivity extends AppCompatActivity implements
     private TextView tvTimerBadge;
     private ImageButton btnGrid;
     private TextView btnStackMode;
+    private ImageButton btnSettings;
     private ImageButton btnSwitchCamera;
 
     private LinearLayout hudPill;
     private TextView hudShutter;
     private TextView hudIso;
     private TextView hudFocus;
+    private TextView hudZoom;
     private TextView tvTipBanner;
+
+    // Quick Zoom Switcher & Live Zoom Badge
+    private LinearLayout layoutQuickZoom;
+    private TextView btnZoom05;
+    private TextView btnZoom1x;
+    private TextView btnZoom2x;
+    private TextView btnZoom5x;
+    private TextView btnZoom10x;
+    private TextView tvLiveZoomBadge;
+    private ScaleGestureDetector scaleGestureDetector;
+    private final Handler zoomBadgeHandler = new Handler(Looper.getMainLooper());
+    private final Runnable hideZoomBadgeRunnable = () -> {
+        if (tvLiveZoomBadge != null) tvLiveZoomBadge.setVisibility(View.GONE);
+    };
 
     private CardView panelManualControls;
     private TextView tabShutter;
     private TextView tabIso;
     private TextView tabFocus;
     private TextView tabEv;
+    private TextView tabZoom;
     private TextView tvParamValue;
     private Slider sliderParam;
     private LinearLayout layoutQuickChips;
 
+    private TextView chipModePhoto;
     private TextView chipModeAstro;
     private TextView chipModeNight;
+    private TextView chipModeStarTrails;
     private TextView chipModePro;
-    private TextView chipModeAuto;
 
     private ShapeableImageView ivGalleryThumbnail;
     private FrameLayout btnShutterContainer;
@@ -87,11 +115,28 @@ public class MainActivity extends AppCompatActivity implements
     private ImageButton btnToggleManualPanel;
 
     private View layoutCaptureOverlay;
+    private View layoutTopTripodProgress;
+    private TextView tvTopTripodCountdown;
+    private TextView tvTopTripodSubframe;
     private CircularProgressIndicator captureProgressBar;
     private TextView tvCaptureCountdown;
     private TextView tvCaptureStatus;
     private TextView tvCaptureSubframe;
+    private TextView tvCaptureHint;
     private com.google.android.material.button.MaterialButton btnStopCapture;
+    private ProgressBar pbSavingProgress;
+
+    // Preferences & Settings
+    private SharedPreferences sharedPreferences;
+    private static final String PREF_TOP_TRIPOD_TIMER = "pref_top_tripod_timer";
+    private static final String PREF_AI_DENOISING = "pref_ai_denoising";
+    private static final String PREF_AI_SATELLITE_FILTER = "pref_ai_satellite_filter";
+    private static final String PREF_AI_SKY_GROUND = "pref_ai_sky_ground";
+
+    private boolean isTopTripodTimerEnabled = true;
+    private boolean isAiDenoiseEnabled = true;
+    private boolean isAiSatelliteFilterEnabled = true;
+    private boolean isAiSkyGroundEnabled = true;
 
     // Controllers & Helpers
     private AstroCameraController cameraController;
@@ -113,12 +158,20 @@ public class MainActivity extends AppCompatActivity implements
             if (captureTotalFrames == 9999) {
                 tvCaptureCountdown.setText(elapsedStr);
                 tvCaptureStatus.setText("Posa B (Bulb) in corso…");
+                if (isTopTripodTimerEnabled && tvTopTripodCountdown != null) {
+                    tvTopTripodCountdown.setText("⏳ " + elapsedStr + " (Posa B)");
+                }
             } else if (captureTotalDurationMs > 0) {
                 String totalStr = formatDuration(captureTotalDurationMs);
                 tvCaptureCountdown.setText(elapsedStr + " / " + totalStr);
                 int percent = (int) Math.min(99, (elapsedMs * 100) / captureTotalDurationMs);
                 captureProgressBar.setProgress(percent);
                 tvCaptureStatus.setText("Esposizione astronomica in corso (" + percent + "%)");
+                if (isTopTripodTimerEnabled && tvTopTripodCountdown != null) {
+                    long remMs = Math.max(0, captureTotalDurationMs - elapsedMs);
+                    String remStr = formatDuration(remMs);
+                    tvTopTripodCountdown.setText("⏳ " + elapsedStr + " / " + totalStr + " (Rimanente: " + remStr + ")");
+                }
             }
 
             mainHandler.postDelayed(this, 300);
@@ -136,7 +189,7 @@ public class MainActivity extends AppCompatActivity implements
     }
 
     // State variables
-    private CameraMode currentMode = CameraMode.ASTRO;
+    private CameraMode currentMode = CameraMode.PHOTO;
     private ManualTab currentTab = ManualTab.SHUTTER;
     private int selfTimerSeconds = 0; // 0 = off, 2, 5, 10
     private boolean isGridEnabled = false;
@@ -181,6 +234,12 @@ public class MainActivity extends AppCompatActivity implements
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        sharedPreferences = getSharedPreferences("MyCameraPrefs", MODE_PRIVATE);
+        isTopTripodTimerEnabled = sharedPreferences.getBoolean(PREF_TOP_TRIPOD_TIMER, true);
+        isAiDenoiseEnabled = sharedPreferences.getBoolean(PREF_AI_DENOISING, true);
+        isAiSatelliteFilterEnabled = sharedPreferences.getBoolean(PREF_AI_SATELLITE_FILTER, true);
+        isAiSkyGroundEnabled = sharedPreferences.getBoolean(PREF_AI_SKY_GROUND, true);
+
         initViews();
         buildPresetTables();
         setupListeners();
@@ -203,27 +262,39 @@ public class MainActivity extends AppCompatActivity implements
         tvTimerBadge = findViewById(R.id.tvTimerBadge);
         btnGrid = findViewById(R.id.btnGrid);
         btnStackMode = findViewById(R.id.btnStackMode);
+        btnSettings = findViewById(R.id.btnSettings);
         btnSwitchCamera = findViewById(R.id.btnSwitchCamera);
 
         hudPill = findViewById(R.id.hudPill);
         hudShutter = findViewById(R.id.hudShutter);
         hudIso = findViewById(R.id.hudIso);
         hudFocus = findViewById(R.id.hudFocus);
+        hudZoom = findViewById(R.id.hudZoom);
         tvTipBanner = findViewById(R.id.tvTipBanner);
+
+        layoutQuickZoom = findViewById(R.id.layoutQuickZoom);
+        btnZoom05 = findViewById(R.id.btnZoom05);
+        btnZoom1x = findViewById(R.id.btnZoom1x);
+        btnZoom2x = findViewById(R.id.btnZoom2x);
+        btnZoom5x = findViewById(R.id.btnZoom5x);
+        btnZoom10x = findViewById(R.id.btnZoom10x);
+        tvLiveZoomBadge = findViewById(R.id.tvLiveZoomBadge);
 
         panelManualControls = findViewById(R.id.panelManualControls);
         tabShutter = findViewById(R.id.tabShutter);
         tabIso = findViewById(R.id.tabIso);
         tabFocus = findViewById(R.id.tabFocus);
         tabEv = findViewById(R.id.tabEv);
+        tabZoom = findViewById(R.id.tabZoom);
         tvParamValue = findViewById(R.id.tvParamValue);
         sliderParam = findViewById(R.id.sliderParam);
         layoutQuickChips = findViewById(R.id.layoutQuickChips);
 
+        chipModePhoto = findViewById(R.id.chipModePhoto);
         chipModeAstro = findViewById(R.id.chipModeAstro);
         chipModeNight = findViewById(R.id.chipModeNight);
+        chipModeStarTrails = findViewById(R.id.chipModeStarTrails);
         chipModePro = findViewById(R.id.chipModePro);
-        chipModeAuto = findViewById(R.id.chipModeAuto);
 
         ivGalleryThumbnail = findViewById(R.id.ivGalleryThumbnail);
         btnShutterContainer = findViewById(R.id.btnShutterContainer);
@@ -231,11 +302,16 @@ public class MainActivity extends AppCompatActivity implements
         btnToggleManualPanel = findViewById(R.id.btnToggleManualPanel);
 
         layoutCaptureOverlay = findViewById(R.id.layoutCaptureOverlay);
+        layoutTopTripodProgress = findViewById(R.id.layoutTopTripodProgress);
+        tvTopTripodCountdown = findViewById(R.id.tvTopTripodCountdown);
+        tvTopTripodSubframe = findViewById(R.id.tvTopTripodSubframe);
         captureProgressBar = findViewById(R.id.captureProgressBar);
         tvCaptureCountdown = findViewById(R.id.tvCaptureCountdown);
         tvCaptureStatus = findViewById(R.id.tvCaptureStatus);
         tvCaptureSubframe = findViewById(R.id.tvCaptureSubframe);
+        tvCaptureHint = findViewById(R.id.tvCaptureHint);
         btnStopCapture = findViewById(R.id.btnStopCapture);
+        pbSavingProgress = findViewById(R.id.pbSavingProgress);
     }
 
     private void buildPresetTables() {
@@ -292,20 +368,53 @@ public class MainActivity extends AppCompatActivity implements
 
     private void initCamera() {
         cameraController = new AstroCameraController(this, textureView, this);
+        cameraController.setAiOptions(isAiDenoiseEnabled, isAiSatelliteFilterEnabled, isAiSkyGroundEnabled);
         cameraController.startCamera();
-        applyMode(CameraMode.ASTRO);
+        // Default mode is standard simple Photo mode like factory camera apps
+        applyMode(CameraMode.PHOTO);
     }
 
     private void setupListeners() {
+        chipModePhoto.setOnClickListener(v -> applyMode(CameraMode.PHOTO));
         chipModeAstro.setOnClickListener(v -> applyMode(CameraMode.ASTRO));
         chipModeNight.setOnClickListener(v -> applyMode(CameraMode.NIGHT));
+        chipModeStarTrails.setOnClickListener(v -> applyMode(CameraMode.STAR_TRAILS));
         chipModePro.setOnClickListener(v -> applyMode(CameraMode.MANUAL));
-        chipModeAuto.setOnClickListener(v -> applyMode(CameraMode.AUTO));
 
         tabShutter.setOnClickListener(v -> selectManualTab(ManualTab.SHUTTER));
         tabIso.setOnClickListener(v -> selectManualTab(ManualTab.ISO));
         tabFocus.setOnClickListener(v -> selectManualTab(ManualTab.FOCUS));
         tabEv.setOnClickListener(v -> selectManualTab(ManualTab.EV));
+        tabZoom.setOnClickListener(v -> selectManualTab(ManualTab.ZOOM));
+
+        // Quick zoom button listeners
+        btnZoom05.setOnClickListener(v -> {
+            if (cameraController != null) cameraController.switchToUltraWide();
+        });
+        btnZoom1x.setOnClickListener(v -> {
+            if (cameraController != null) {
+                cameraController.switchToMainCamera();
+                cameraController.setZoom(1.0f);
+            }
+        });
+        btnZoom2x.setOnClickListener(v -> {
+            if (cameraController != null) {
+                cameraController.switchToMainCamera();
+                cameraController.setZoom(2.0f);
+            }
+        });
+        btnZoom5x.setOnClickListener(v -> {
+            if (cameraController != null) {
+                cameraController.switchToMainCamera();
+                cameraController.setZoom(5.0f);
+            }
+        });
+        btnZoom10x.setOnClickListener(v -> {
+            if (cameraController != null) {
+                cameraController.switchToMainCamera();
+                cameraController.setZoom(10.0f);
+            }
+        });
 
         btnToggleManualPanel.setOnClickListener(v -> {
             boolean isVisible = panelManualControls.getVisibility() == View.VISIBLE;
@@ -324,7 +433,35 @@ public class MainActivity extends AppCompatActivity implements
         btnTimer.setOnClickListener(v -> toggleTimer());
         btnGrid.setOnClickListener(v -> toggleGridAndLevel());
         btnStackMode.setOnClickListener(v -> toggleStackMode());
+        btnSettings.setOnClickListener(v -> showSettingsDialog());
+
         btnStopCapture.setOnClickListener(v -> {
+            mainHandler.removeCallbacks(exposureTickerRunnable);
+            btnStopCapture.setEnabled(false);
+            btnStopCapture.setText("⏳ Salvataggio in corso…");
+            btnStopCapture.setBackgroundTintList(ColorStateList.valueOf(getColor(R.color.bg_dark_card)));
+            btnStopCapture.setTextColor(getColor(R.color.astro_cyan));
+            if (pbSavingProgress != null) {
+                pbSavingProgress.setVisibility(View.VISIBLE);
+            }
+
+            long elapsedMs = System.currentTimeMillis() - captureStartTimestamp;
+            String elapsedStr = formatDuration(elapsedMs);
+            if (captureTotalFrames == 9999) {
+                tvCaptureCountdown.setText(elapsedStr);
+                if (isTopTripodTimerEnabled && tvTopTripodCountdown != null) {
+                    tvTopTripodCountdown.setText("⏳ " + elapsedStr + " • Salvataggio...");
+                }
+            } else if (captureTotalDurationMs > 0) {
+                String totalStr = formatDuration(captureTotalDurationMs);
+                tvCaptureCountdown.setText(elapsedStr + " / " + totalStr);
+                if (isTopTripodTimerEnabled && tvTopTripodCountdown != null) {
+                    tvTopTripodCountdown.setText("⏳ " + elapsedStr + " / " + totalStr + " • Salvataggio...");
+                }
+            }
+
+            tvCaptureStatus.setText("Elaborazione e fusione fotogrammi…");
+            tvCaptureHint.setText("Attendere il completamento del salvataggio in galleria…");
             if (cameraController != null) {
                 cameraController.stopCaptureAndSave();
             }
@@ -337,8 +474,21 @@ public class MainActivity extends AppCompatActivity implements
 
         ivGalleryThumbnail.setOnClickListener(v -> openGalleryOrLastImage());
 
+        // Setup Pinch-to-Zoom ScaleGestureDetector
+        scaleGestureDetector = new ScaleGestureDetector(this, new ScaleGestureDetector.SimpleOnScaleGestureListener() {
+            @Override
+            public boolean onScale(ScaleGestureDetector detector) {
+                if (cameraController == null) return false;
+                float scaleFactor = detector.getScaleFactor();
+                float targetZoom = cameraController.getCurrentZoom() * scaleFactor;
+                cameraController.setZoom(targetZoom);
+                return true;
+            }
+        });
+
         textureView.setOnTouchListener((v, event) -> {
-            if (event.getAction() == MotionEvent.ACTION_UP) {
+            scaleGestureDetector.onTouchEvent(event);
+            if (event.getPointerCount() == 1 && event.getAction() == MotionEvent.ACTION_UP) {
                 float x = event.getX();
                 float y = event.getY();
                 overlayView.showFocusRing(x, y);
@@ -355,8 +505,68 @@ public class MainActivity extends AppCompatActivity implements
         });
     }
 
+    private void showSettingsDialog() {
+        View dialogView = getLayoutInflater().inflate(R.layout.dialog_settings, null);
+        AlertDialog dialog = new MaterialAlertDialogBuilder(this)
+                .setView(dialogView)
+                .create();
+
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+        }
+
+        MaterialSwitch switchTopTripodTimer = dialogView.findViewById(R.id.switchTopTripodTimer);
+        MaterialSwitch switchAiDenoising = dialogView.findViewById(R.id.switchAiDenoising);
+        MaterialSwitch switchAiSatelliteFilter = dialogView.findViewById(R.id.switchAiSatelliteFilter);
+        MaterialSwitch switchAiSkyGround = dialogView.findViewById(R.id.switchAiSkyGround);
+
+        ImageButton btnCloseSettings = dialogView.findViewById(R.id.btnCloseSettings);
+        com.google.android.material.button.MaterialButton btnDoneSettings = dialogView.findViewById(R.id.btnDoneSettings);
+
+        switchTopTripodTimer.setChecked(isTopTripodTimerEnabled);
+        switchTopTripodTimer.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            isTopTripodTimerEnabled = isChecked;
+            sharedPreferences.edit().putBoolean(PREF_TOP_TRIPOD_TIMER, isChecked).apply();
+        });
+
+        if (switchAiDenoising != null) {
+            switchAiDenoising.setChecked(isAiDenoiseEnabled);
+            switchAiDenoising.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                isAiDenoiseEnabled = isChecked;
+                sharedPreferences.edit().putBoolean(PREF_AI_DENOISING, isChecked).apply();
+                if (cameraController != null) cameraController.setAiOptions(isAiDenoiseEnabled, isAiSatelliteFilterEnabled, isAiSkyGroundEnabled);
+            });
+        }
+
+        if (switchAiSatelliteFilter != null) {
+            switchAiSatelliteFilter.setChecked(isAiSatelliteFilterEnabled);
+            switchAiSatelliteFilter.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                isAiSatelliteFilterEnabled = isChecked;
+                sharedPreferences.edit().putBoolean(PREF_AI_SATELLITE_FILTER, isChecked).apply();
+                if (cameraController != null) cameraController.setAiOptions(isAiDenoiseEnabled, isAiSatelliteFilterEnabled, isAiSkyGroundEnabled);
+            });
+        }
+
+        if (switchAiSkyGround != null) {
+            switchAiSkyGround.setChecked(isAiSkyGroundEnabled);
+            switchAiSkyGround.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                isAiSkyGroundEnabled = isChecked;
+                sharedPreferences.edit().putBoolean(PREF_AI_SKY_GROUND, isChecked).apply();
+                if (cameraController != null) cameraController.setAiOptions(isAiDenoiseEnabled, isAiSatelliteFilterEnabled, isAiSkyGroundEnabled);
+            });
+        }
+
+        btnCloseSettings.setOnClickListener(v -> dialog.dismiss());
+        btnDoneSettings.setOnClickListener(v -> dialog.dismiss());
+
+        dialog.show();
+    }
+
     private void applyMode(CameraMode mode) {
         this.currentMode = mode;
+
+        chipModePhoto.setBackgroundResource(mode == CameraMode.PHOTO ? R.drawable.bg_chip_selected : R.drawable.bg_chip_unselected);
+        chipModePhoto.setTextColor(mode == CameraMode.PHOTO ? getColor(R.color.black) : getColor(R.color.white));
 
         chipModeAstro.setBackgroundResource(mode == CameraMode.ASTRO ? R.drawable.bg_chip_selected : R.drawable.bg_chip_unselected);
         chipModeAstro.setTextColor(mode == CameraMode.ASTRO ? getColor(R.color.black) : getColor(R.color.white));
@@ -364,25 +574,38 @@ public class MainActivity extends AppCompatActivity implements
         chipModeNight.setBackgroundResource(mode == CameraMode.NIGHT ? R.drawable.bg_chip_selected : R.drawable.bg_chip_unselected);
         chipModeNight.setTextColor(mode == CameraMode.NIGHT ? getColor(R.color.black) : getColor(R.color.white));
 
+        chipModeStarTrails.setBackgroundResource(mode == CameraMode.STAR_TRAILS ? R.drawable.bg_chip_selected : R.drawable.bg_chip_unselected);
+        chipModeStarTrails.setTextColor(mode == CameraMode.STAR_TRAILS ? getColor(R.color.black) : getColor(R.color.white));
+
         chipModePro.setBackgroundResource(mode == CameraMode.MANUAL ? R.drawable.bg_chip_selected : R.drawable.bg_chip_unselected);
         chipModePro.setTextColor(mode == CameraMode.MANUAL ? getColor(R.color.black) : getColor(R.color.white));
-
-        chipModeAuto.setBackgroundResource(mode == CameraMode.AUTO ? R.drawable.bg_chip_selected : R.drawable.bg_chip_unselected);
-        chipModeAuto.setTextColor(mode == CameraMode.AUTO ? getColor(R.color.black) : getColor(R.color.white));
 
         if (cameraController == null) return;
 
         switch (mode) {
+            case PHOTO:
+                // Standard Simple Photo Mode (Default): full auto, instant capture
+                cameraController.setManualExposureNs(-1);
+                cameraController.setManualIso(-1);
+                cameraController.setManualFocusDistance(-1f);
+                selfTimerSeconds = 0;
+                updateTimerUI();
+                tvTipBanner.setVisibility(View.GONE);
+                panelManualControls.setVisibility(View.GONE);
+                btnToggleManualPanel.setBackgroundResource(R.drawable.bg_chip_unselected);
+                ivShutterIcon.setImageResource(R.drawable.ic_auto_mode);
+                break;
+
             case ASTRO:
-                // Astro Mode: 2 to 3 minutes stacking exposure, ISO 1600, Focus Infinity (∞)
+                // Astro Mode: 2 minutes exposure integration, maximum sensor sensitivity, calibrated infinity focus
                 cameraController.setManualExposureNs(120_000_000_000L); // 2 minuti (120s)
-                cameraController.setManualIso(1600);
-                cameraController.setManualFocusDistance(0.0f); // Infinity Focus!
+                cameraController.setManualIso(-1); // Automatically chooses max clean ISO for sensor
+                cameraController.setManualFocusDistance(cameraController.getOptimalAstroFocusDistance());
                 cameraController.setStackingMode(ImageStacker.StackingMode.DEEP_SKY_INTEGRATION);
-                btnStackMode.setText("🌌 Deep Sky");
                 selfTimerSeconds = 3;
                 updateTimerUI();
-                tvTipBanner.setText("🌌 Modalità Astro 2m: Stacking integrato • Fuoco Infinito (∞) • Treppiede");
+                updateStackModeUI(cameraController.getStackingMode());
+                tvTipBanner.setText("🌌 Deep Sky: Integrazione multi-frame Asinh • Stelle puntiformi");
                 tvTipBanner.setVisibility(View.VISIBLE);
                 panelManualControls.setVisibility(View.GONE);
                 btnToggleManualPanel.setBackgroundResource(R.drawable.bg_chip_unselected);
@@ -390,10 +613,12 @@ public class MainActivity extends AppCompatActivity implements
                 break;
 
             case NIGHT:
-                // Night Landscape: 4s exposure, ISO 800, Focus: Infinity
+                // Night Landscape: 4s exposure, ISO 800.
+                // Focus: auto AF (not fixed infinity) since night landscapes often have subjects
+                // at intermediate distances (buildings, trees at 20–200m), not purely at infinity.
                 cameraController.setManualExposureNs(4_000_000_000L); // 4 seconds
                 cameraController.setManualIso(800);
-                cameraController.setManualFocusDistance(0.0f);
+                cameraController.setManualFocusDistance(-1f); // AF auto: let the camera decide
                 cameraController.setStackingMode(ImageStacker.StackingMode.DEEP_SKY_INTEGRATION);
                 selfTimerSeconds = 2;
                 updateTimerUI();
@@ -404,22 +629,30 @@ public class MainActivity extends AppCompatActivity implements
                 ivShutterIcon.setImageResource(R.drawable.ic_night_mode);
                 break;
 
+            case STAR_TRAILS:
+                // Star Trails Mode: Continuous Max-Lightness Integration for star arches & Earth rotation.
+                // 30 min (1800s) is the astrophotography standard minimum for photogenic arcs.
+                // Sub-frame = 25s (set in AstroCameraController): prevents dark current and sky saturation.
+                cameraController.setManualExposureNs(1_800_000_000_000L); // 30 min default
+                cameraController.setManualIso(800);
+                cameraController.setManualFocusDistance(cameraController.getOptimalAstroFocusDistance());
+                cameraController.setStackingMode(ImageStacker.StackingMode.STAR_TRAILS);
+                selfTimerSeconds = 3;
+                updateTimerUI();
+                updateStackModeUI(ImageStacker.StackingMode.STAR_TRAILS);
+                tvTipBanner.setText("🌠 Scie Stellari: 30 min • Sub-frame 25s • Treppiede indispensabile");
+                tvTipBanner.setVisibility(View.VISIBLE);
+                panelManualControls.setVisibility(View.GONE);
+                btnToggleManualPanel.setBackgroundResource(R.drawable.bg_chip_unselected);
+                ivShutterIcon.setImageResource(R.drawable.ic_astro_mode);
+                break;
+
             case MANUAL:
                 panelManualControls.setVisibility(View.VISIBLE);
                 btnToggleManualPanel.setBackgroundResource(R.drawable.bg_chip_selected);
                 selectManualTab(ManualTab.SHUTTER);
                 tvTipBanner.setVisibility(View.GONE);
                 ivShutterIcon.setImageResource(R.drawable.ic_tune);
-                break;
-
-            case AUTO:
-                cameraController.setManualExposureNs(-1);
-                cameraController.setManualIso(-1);
-                cameraController.setManualFocusDistance(-1f);
-                tvTipBanner.setVisibility(View.GONE);
-                panelManualControls.setVisibility(View.GONE);
-                btnToggleManualPanel.setBackgroundResource(R.drawable.bg_chip_unselected);
-                ivShutterIcon.setImageResource(R.drawable.ic_auto_mode);
                 break;
         }
     }
@@ -439,6 +672,9 @@ public class MainActivity extends AppCompatActivity implements
         tabEv.setBackgroundResource(tab == ManualTab.EV ? R.drawable.bg_chip_selected : R.drawable.bg_chip_unselected);
         tabEv.setTextColor(tab == ManualTab.EV ? getColor(R.color.black) : getColor(R.color.white));
 
+        tabZoom.setBackgroundResource(tab == ManualTab.ZOOM ? R.drawable.bg_chip_selected : R.drawable.bg_chip_unselected);
+        tabZoom.setTextColor(tab == ManualTab.ZOOM ? getColor(R.color.black) : getColor(R.color.white));
+
         layoutQuickChips.removeAllViews();
 
         switch (tab) {
@@ -454,6 +690,59 @@ public class MainActivity extends AppCompatActivity implements
             case EV:
                 setupEvTab();
                 break;
+            case ZOOM:
+                setupZoomTab();
+                break;
+        }
+    }
+
+    private void setupZoomTab() {
+        float min = (cameraController != null) ? cameraController.getMinZoom() : 0.5f;
+        float max = (cameraController != null) ? cameraController.getMaxZoom() : 10.0f;
+        int minInt = Math.round(min * 10f); // 5
+        int maxInt = Math.round(max * 10f); // 100
+
+        sliderParam.setTrackActiveTintList(ColorStateList.valueOf(getColor(R.color.astro_cyan)));
+        sliderParam.setThumbTintList(ColorStateList.valueOf(getColor(R.color.astro_cyan)));
+
+        float cur = (cameraController != null) ? cameraController.getCurrentZoom() : 1.0f;
+        int activeVal = Math.min(maxInt, Math.max(minInt, Math.round(cur * 10f)));
+
+        try {
+            sliderParam.setValue(Math.min(sliderParam.getValueTo(), Math.max(sliderParam.getValueFrom(), minInt)));
+            sliderParam.setValueFrom(minInt);
+            sliderParam.setValueTo(maxInt);
+            sliderParam.setStepSize(1f);
+            sliderParam.setValue(activeVal);
+        } catch (Exception e) {
+            Log.e("MainActivity", "Error setting standard slider values", e);
+        }
+
+        tvParamValue.setText(String.format(Locale.getDefault(), "Zoom: %.1fx", cur));
+        tvParamValue.setTextColor(getColor(R.color.astro_cyan));
+
+        float[] zoomSteps = {0.5f, 1.0f, 2.0f, 3.0f, 5.0f, 10.0f};
+        String[] zoomLabels = {"0.5x (Grandangolo)", "1.0x (1x)", "2.0x (2x)", "3.0x (3x)", "5.0x (Tele)", "10.0x (Max)"};
+
+        for (int i = 0; i < zoomSteps.length; i++) {
+            final float z = zoomSteps[i];
+            String label = zoomLabels[i];
+            boolean isSelected = Math.abs(cur - z) < 0.15f;
+            TextView chip = createChip(label, isSelected);
+            chip.setOnClickListener(v -> {
+                if (cameraController != null) {
+                    if (z == 0.5f) {
+                        cameraController.switchToUltraWide();
+                    } else {
+                        cameraController.switchToMainCamera();
+                        cameraController.setZoom(z);
+                    }
+                    try {
+                        sliderParam.setValue(Math.round(z * 10f));
+                    } catch (Exception ignored) {}
+                }
+            });
+            layoutQuickChips.addView(chip);
         }
     }
 
@@ -616,6 +905,12 @@ public class MainActivity extends AppCompatActivity implements
                 tvParamValue.setText(String.format(Locale.getDefault(), "Compensazione: %+.1f EV", ev));
                 cameraController.setAeCompensation(index);
                 break;
+
+            case ZOOM:
+                float zoom = index / 10.0f;
+                tvParamValue.setText(String.format(Locale.getDefault(), "Zoom: %.1fx", zoom));
+                cameraController.setZoom(zoom);
+                break;
         }
     }
 
@@ -702,6 +997,27 @@ public class MainActivity extends AppCompatActivity implements
         btnGrid.setColorFilter(isGridEnabled ? getColor(R.color.astro_cyan) : getColor(R.color.white));
     }
 
+    private void updateStackModeUI(ImageStacker.StackingMode mode) {
+        if (btnStackMode == null) return;
+        if (mode == ImageStacker.StackingMode.STAR_TRAILS) {
+            btnStackMode.setText("🌠 Star Trails");
+            btnStackMode.setTextColor(getColor(R.color.black));
+            btnStackMode.setBackgroundResource(R.drawable.bg_chip_selected);
+            if (currentMode == CameraMode.ASTRO) {
+                tvTipBanner.setText("🌠 Star Trails: Fusione luminosa continua • Tracce Stellari • Treppiede fisso");
+                tvTipBanner.setVisibility(View.VISIBLE);
+            }
+        } else {
+            btnStackMode.setText("🌌 Deep Sky");
+            btnStackMode.setTextColor(getColor(R.color.astro_cyan));
+            btnStackMode.setBackgroundResource(R.drawable.bg_chip_unselected);
+            if (currentMode == CameraMode.ASTRO) {
+                tvTipBanner.setText("🌌 Modalità Astro 2m: Stacking integrato • Fuoco Infinito (∞) • Treppiede");
+                tvTipBanner.setVisibility(View.VISIBLE);
+            }
+        }
+    }
+
     private void toggleStackMode() {
         if (cameraController == null) return;
         ImageStacker.StackingMode current = cameraController.getStackingMode();
@@ -709,14 +1025,11 @@ public class MainActivity extends AppCompatActivity implements
                 ImageStacker.StackingMode.STAR_TRAILS : ImageStacker.StackingMode.DEEP_SKY_INTEGRATION;
 
         cameraController.setStackingMode(next);
-        btnStackMode.setText(next == ImageStacker.StackingMode.DEEP_SKY_INTEGRATION ?
-                "🌌 Deep Sky" : "🌠 Star Trails");
-        btnStackMode.setTextColor(next == ImageStacker.StackingMode.DEEP_SKY_INTEGRATION ?
-                getColor(R.color.astro_cyan) : getColor(R.color.astro_amber));
+        updateStackModeUI(next);
 
-        Toast.makeText(this, next == ImageStacker.StackingMode.DEEP_SKY_INTEGRATION ?
-                "Modalità Integrazione Segnale (Denoise & Nebulose)" :
-                "Modalità Tracce Stellari (Star Trails)", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, next == ImageStacker.StackingMode.STAR_TRAILS ?
+                "🌠 Modalità Star Trails (Tracce Stellari attive)" :
+                "🌌 Modalità Deep Sky (Integrazione & Denoise)", Toast.LENGTH_SHORT).show();
     }
 
     private void openGalleryOrLastImage() {
@@ -740,46 +1053,95 @@ public class MainActivity extends AppCompatActivity implements
         }
     }
 
+    // CameraEventListener callbacks
     @Override
     public void onCameraReady(AstroCameraController.CameraCapabilities capabilities) {
-        if (capabilities.exposureTimeRange != null) {
-            long maxSec = capabilities.exposureTimeRange.getUpper() / 1_000_000_000L;
-            Toast.makeText(this, "Sensore Fotocamera Pronto. Sensore singolo: " + maxSec + "s (Astro fino a 5 min)", Toast.LENGTH_SHORT).show();
+        if (btnZoom05 != null) {
+            btnZoom05.setVisibility(View.VISIBLE);
+        }
+        if (currentTab != null) {
+            selectManualTab(currentTab);
         }
     }
 
     @Override
     public void onExposureUpdated(long exposureNs, int iso, float focusDistance) {
-        String expStr;
-        if (exposureNs == -2L) {
-            expStr = "⏱ Bulb";
-        } else if (exposureNs >= 60_000_000_000L) {
-            int min = (int) (exposureNs / 60_000_000_000L);
-            long remSec = (exposureNs % 60_000_000_000L) / 1_000_000_000L;
-            expStr = (remSec > 0) ? String.format(Locale.getDefault(), "⏱ %dm %ds", min, remSec) : String.format(Locale.getDefault(), "⏱ %d min", min);
-        } else if (exposureNs >= 1_000_000_000L) {
-            double sec = exposureNs / 1_000_000_000.0;
-            expStr = String.format(Locale.getDefault(), "⏱ %.1fs", sec);
-        } else if (exposureNs > 0) {
-            int denom = (int) Math.round(1_000_000_000.0 / exposureNs);
-            expStr = "⏱ 1/" + denom + "s";
+        // Update Shutter HUD
+        if (exposureNs > 0) {
+            if (exposureNs >= 1_000_000_000L) {
+                double sec = exposureNs / 1_000_000_000.0;
+                hudShutter.setText(String.format(Locale.getDefault(), "⏱ %.1fs", sec));
+            } else {
+                long denom = Math.round(1_000_000_000.0 / exposureNs);
+                hudShutter.setText(String.format(Locale.getDefault(), "⏱ 1/%ds", denom));
+            }
         } else {
-            expStr = "⏱ Auto";
+            hudShutter.setText("⏱ Auto");
         }
-        hudShutter.setText(expStr);
 
-        hudIso.setText(iso > 0 ? "ISO " + iso : "ISO Auto");
+        // Update ISO HUD
+        if (iso > 0) {
+            hudIso.setText("ISO " + iso);
+        } else {
+            hudIso.setText("ISO Auto");
+        }
 
+        // Update Focus HUD
         String focusStr;
         if (focusDistance == 0.0f) {
-            focusStr = "🎯 ∞ (Infinito)";
-        } else if (focusDistance > 0f) {
+            focusStr = "🎯 ∞";
+        } else if (focusDistance > 0) {
             float distMeters = 1.0f / focusDistance;
             focusStr = String.format(Locale.getDefault(), "🎯 %.1fm", distMeters);
         } else {
             focusStr = "🎯 AF";
         }
         hudFocus.setText(focusStr);
+    }
+
+    @Override
+    public void onZoomUpdated(float currentZoom, float minZoom, float maxZoom) {
+        hudZoom.setText(String.format(Locale.getDefault(), "🔍 %.1fx", currentZoom));
+
+        // Update quick zoom pill buttons selection (.5, 1x, 2x, 5x, 10x)
+        updateQuickZoomPillSelection(currentZoom);
+
+        // Show live floating zoom badge with auto-hide animation
+        tvLiveZoomBadge.setText(String.format(Locale.getDefault(), "%.1fx", currentZoom));
+        tvLiveZoomBadge.setTextColor(getColor(R.color.astro_cyan));
+        tvLiveZoomBadge.setVisibility(View.VISIBLE);
+        zoomBadgeHandler.removeCallbacks(hideZoomBadgeRunnable);
+        zoomBadgeHandler.postDelayed(hideZoomBadgeRunnable, 1500);
+
+        if (currentTab == ManualTab.ZOOM) {
+            tvParamValue.setText(String.format(Locale.getDefault(), "Zoom: %.1fx", currentZoom));
+            int val = Math.round(currentZoom * 10f);
+            if (!sliderParam.isPressed()) {
+                try {
+                    if (val >= (int) sliderParam.getValueFrom() && val <= (int) sliderParam.getValueTo()
+                            && Math.round(sliderParam.getValue()) != val) {
+                        sliderParam.setValue(val);
+                    }
+                } catch (Exception ignored) {}
+            }
+        }
+    }
+
+    private void updateQuickZoomPillSelection(float zoom) {
+        btnZoom05.setBackgroundResource(Math.abs(zoom - 0.5f) < 0.2f ? R.drawable.bg_zoom_circle_selected : R.drawable.bg_zoom_circle_unselected);
+        btnZoom05.setTextColor(Math.abs(zoom - 0.5f) < 0.2f ? getColor(R.color.black) : getColor(R.color.white));
+
+        btnZoom1x.setBackgroundResource(Math.abs(zoom - 1.0f) < 0.3f ? R.drawable.bg_zoom_circle_selected : R.drawable.bg_zoom_circle_unselected);
+        btnZoom1x.setTextColor(Math.abs(zoom - 1.0f) < 0.3f ? getColor(R.color.black) : getColor(R.color.white));
+
+        btnZoom2x.setBackgroundResource(Math.abs(zoom - 2.0f) < 0.5f ? R.drawable.bg_zoom_circle_selected : R.drawable.bg_zoom_circle_unselected);
+        btnZoom2x.setTextColor(Math.abs(zoom - 2.0f) < 0.5f ? getColor(R.color.black) : getColor(R.color.white));
+
+        btnZoom5x.setBackgroundResource(Math.abs(zoom - 5.0f) < 1.0f ? R.drawable.bg_zoom_circle_selected : R.drawable.bg_zoom_circle_unselected);
+        btnZoom5x.setTextColor(Math.abs(zoom - 5.0f) < 1.0f ? getColor(R.color.black) : getColor(R.color.white));
+
+        btnZoom10x.setBackgroundResource(Math.abs(zoom - 10.0f) < 1.5f ? R.drawable.bg_zoom_circle_selected : R.drawable.bg_zoom_circle_unselected);
+        btnZoom10x.setTextColor(Math.abs(zoom - 10.0f) < 1.5f ? getColor(R.color.black) : getColor(R.color.white));
     }
 
     @Override
@@ -792,13 +1154,29 @@ public class MainActivity extends AppCompatActivity implements
         captureTotalDurationMs = estimatedDurationMs;
         captureTotalFrames = totalFrames;
 
-        if (totalFrames > 1) {
+        boolean isMultiFrame = (estimatedDurationMs > 0 || totalFrames == -1 || totalFrames > 1);
+
+        if (isTopTripodTimerEnabled && layoutTopTripodProgress != null) {
+            layoutTopTripodProgress.setVisibility(View.VISIBLE);
+            tvTopTripodCountdown.setText(estimatedDurationMs > 0 ? ("⏳ 0s / " + formatDuration(estimatedDurationMs)) : "⏳ 0s (Posa B)");
+            tvTopTripodSubframe.setText("Frame acquisiti: 1");
+        } else if (layoutTopTripodProgress != null) {
+            layoutTopTripodProgress.setVisibility(View.GONE);
+        }
+
+        if (isMultiFrame) {
             tvCaptureSubframe.setVisibility(View.VISIBLE);
-            tvCaptureSubframe.setText("Integrazione Frame: 1 di " + (totalFrames == 9999 ? "∞" : totalFrames));
+            tvCaptureSubframe.setText("Frame acquisiti: 1 (Acquisizione continua)");
             btnStopCapture.setVisibility(View.VISIBLE);
+            btnStopCapture.setEnabled(true);
+            btnStopCapture.setText("⏹️ Termina e Salva Foto");
+            btnStopCapture.setBackgroundTintList(ColorStateList.valueOf(getColor(R.color.astro_cyan)));
+            btnStopCapture.setTextColor(getColor(R.color.black));
+            if (pbSavingProgress != null) pbSavingProgress.setVisibility(View.GONE);
         } else {
             tvCaptureSubframe.setVisibility(View.GONE);
             btnStopCapture.setVisibility(View.GONE);
+            if (pbSavingProgress != null) pbSavingProgress.setVisibility(View.GONE);
         }
 
         mainHandler.removeCallbacks(exposureTickerRunnable);
@@ -807,16 +1185,24 @@ public class MainActivity extends AppCompatActivity implements
 
     @Override
     public void onStackProgress(int currentFrame, int totalFrames, long elapsedMs, long totalMs) {
-        if (totalFrames == 9999) {
-            tvCaptureSubframe.setText("Frame integrati: " + currentFrame + " • Tocca per terminare");
+        if (totalMs == 0) {
+            tvCaptureSubframe.setText("Frame acquisiti: " + currentFrame + " • Tocca per terminare");
+            if (isTopTripodTimerEnabled && tvTopTripodSubframe != null) {
+                tvTopTripodSubframe.setText("Frame acquisiti: " + currentFrame + " (Posa continua)");
+            }
         } else {
-            tvCaptureSubframe.setText("Integrazione: Frame " + currentFrame + " di " + totalFrames + " acquisito");
+            tvCaptureSubframe.setText("Frame acquisiti: " + currentFrame + " (Acquisizione continua)");
+            if (isTopTripodTimerEnabled && tvTopTripodSubframe != null) {
+                tvTopTripodSubframe.setText("Frame elaborati: " + currentFrame);
+            }
         }
     }
 
     @Override
     public void onCaptureCompleted(Uri imageUri, Bitmap thumbnail) {
         mainHandler.removeCallbacks(exposureTickerRunnable);
+        if (pbSavingProgress != null) pbSavingProgress.setVisibility(View.GONE);
+        if (layoutTopTripodProgress != null) layoutTopTripodProgress.setVisibility(View.GONE);
         layoutCaptureOverlay.setVisibility(View.GONE);
         this.lastCapturedUri = imageUri;
 
@@ -829,6 +1215,8 @@ public class MainActivity extends AppCompatActivity implements
     @Override
     public void onCaptureFailed(String errorMessage) {
         mainHandler.removeCallbacks(exposureTickerRunnable);
+        if (pbSavingProgress != null) pbSavingProgress.setVisibility(View.GONE);
+        if (layoutTopTripodProgress != null) layoutTopTripodProgress.setVisibility(View.GONE);
         layoutCaptureOverlay.setVisibility(View.GONE);
         Toast.makeText(this, "Errore scatto: " + errorMessage, Toast.LENGTH_LONG).show();
     }

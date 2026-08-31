@@ -43,97 +43,100 @@
         android:paddingHorizontal="16dp"
         android:paddingTop="36dp"
         android:paddingBottom="12dp"
-        android:background="@drawable/bg_panel_rounded"
-        android:rotation="180"
+        android:background="@drawable/bg_top_bar"
         app:layout_constraintTop_toTopOf="parent">
 
-        <!-- Unrotate child layout so items display right side up with top curved background -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:rotation="180">
+        <!-- Flash Button -->
+        <ImageButton
+            android:id="@+id/btnFlash"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_flash_off"
+            android:contentDescription="Flash / Torcia"
+            app:tint="@color/white" />
 
-            <!-- Flash Button -->
+        <!-- Timer Button -->
+        <FrameLayout
+            android:id="@+id/btnTimerContainer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp">
+
             <ImageButton
-                android:id="@+id/btnFlash"
+                android:id="@+id/btnTimer"
                 android:layout_width="44dp"
                 android:layout_height="44dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
-                android:src="@drawable/ic_flash_off"
-                android:contentDescription="Flash / Torcia"
+                android:src="@drawable/ic_timer"
+                android:contentDescription="Autoscatto"
                 app:tint="@color/white" />
 
-            <!-- Timer Button -->
-            <FrameLayout
-                android:id="@+id/btnTimerContainer"
+            <TextView
+                android:id="@+id/tvTimerBadge"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="8dp">
-
-                <ImageButton
-                    android:id="@+id/btnTimer"
-                    android:layout_width="44dp"
-                    android:layout_height="44dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:src="@drawable/ic_timer"
-                    android:contentDescription="Autoscatto"
-                    app:tint="@color/white" />
-
-                <TextView
-                    android:id="@+id/tvTimerBadge"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="bottom|end"
-                    android:text=""
-                    android:textSize="10sp"
-                    android:textStyle="bold"
-                    android:textColor="@color/astro_cyan"
-                    android:visibility="gone" />
-            </FrameLayout>
-
-            <!-- Grid & Horizon Toggle -->
-            <ImageButton
-                android:id="@+id/btnGrid"
-                android:layout_width="44dp"
-                android:layout_height="44dp"
-                android:layout_marginStart="8dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:src="@drawable/ic_grid"
-                android:contentDescription="Griglia e Livella"
-                app:tint="@color/white" />
-
-            <!-- Stacking Mode (Deep Sky vs Star Trails) -->
-            <TextView
-                android:id="@+id/btnStackMode"
-                android:layout_width="wrap_content"
-                android:layout_height="32dp"
-                android:layout_marginStart="8dp"
-                android:background="@drawable/bg_chip_unselected"
-                android:gravity="center"
-                android:paddingHorizontal="10dp"
-                android:text="🌌 Deep Sky"
+                android:layout_gravity="bottom|end"
+                android:text=""
+                android:textSize="10sp"
+                android:textStyle="bold"
                 android:textColor="@color/astro_cyan"
-                android:textSize="11sp"
-                android:textStyle="bold" />
+                android:visibility="gone" />
+        </FrameLayout>
 
-            <View
-                android:layout_width="0dp"
-                android:layout_height="1dp"
-                android:layout_weight="1" />
+        <!-- Grid & Horizon Toggle -->
+        <ImageButton
+            android:id="@+id/btnGrid"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginStart="8dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_grid"
+            android:contentDescription="Griglia e Livella"
+            app:tint="@color/white" />
 
-            <!-- Switch Camera Button -->
-            <ImageButton
-                android:id="@+id/btnSwitchCamera"
-                android:layout_width="44dp"
-                android:layout_height="44dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:src="@drawable/ic_switch_camera"
-                android:contentDescription="Cambia Fotocamera"
-                app:tint="@color/white" />
+        <!-- Stacking Mode (Deep Sky vs Star Trails) -->
+        <TextView
+            android:id="@+id/btnStackMode"
+            android:layout_width="wrap_content"
+            android:layout_height="34dp"
+            android:layout_marginStart="8dp"
+            android:background="@drawable/bg_chip_unselected"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:paddingHorizontal="12dp"
+            android:text="🌌 Deep Sky"
+            android:textColor="@color/astro_cyan"
+            android:textSize="11sp"
+            android:textStyle="bold" />
 
-        </LinearLayout>
+        <View
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <!-- Settings Button -->
+        <ImageButton
+            android:id="@+id/btnSettings"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginEnd="4dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_settings"
+            android:contentDescription="Impostazioni"
+            app:tint="@color/white" />
+
+        <!-- Switch Camera Button -->
+        <ImageButton
+            android:id="@+id/btnSwitchCamera"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_switch_camera"
+            android:contentDescription="Cambia Fotocamera"
+            app:tint="@color/white" />
+
     </LinearLayout>
 
     <!-- Real-time HUD Parameters Pill -->
@@ -193,6 +196,23 @@
             android:textSize="12sp"
             android:textStyle="bold" />
 
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="6dp"
+            android:text="|"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/hudZoom"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🔍 1.0x"
+            android:textColor="@color/astro_cyan"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
     </LinearLayout>
 
     <!-- Tips Banner for Astrophotography -->
@@ -214,6 +234,100 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
+    <!-- Floating Live Zoom Ratio Badge (Pinch-to-zoom indicator) -->
+    <TextView
+        android:id="@+id/tvLiveZoomBadge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp"
+        android:background="@drawable/bg_hud_pill"
+        android:paddingHorizontal="14dp"
+        android:paddingVertical="4dp"
+        android:text="1.0x"
+        android:textColor="@color/astro_cyan"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@id/layoutQuickZoom"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- Floating Quick Zoom Pill (0.5x, 1x, 2x, 5x, 10x) -->
+    <LinearLayout
+        android:id="@+id/layoutQuickZoom"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="10dp"
+        android:background="@drawable/bg_zoom_pill"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="6dp"
+        android:paddingVertical="4dp"
+        app:layout_constraintBottom_toTopOf="@id/panelManualControls"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <TextView
+            android:id="@+id/btnZoom05"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_marginEnd="4dp"
+            android:background="@drawable/bg_zoom_circle_unselected"
+            android:gravity="center"
+            android:text=".5"
+            android:textColor="@color/white"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/btnZoom1x"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_marginEnd="4dp"
+            android:background="@drawable/bg_zoom_circle_selected"
+            android:gravity="center"
+            android:text="1x"
+            android:textColor="@color/black"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/btnZoom2x"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_marginEnd="4dp"
+            android:background="@drawable/bg_zoom_circle_unselected"
+            android:gravity="center"
+            android:text="2x"
+            android:textColor="@color/white"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/btnZoom5x"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_marginEnd="4dp"
+            android:background="@drawable/bg_zoom_circle_unselected"
+            android:gravity="center"
+            android:text="5x"
+            android:textColor="@color/white"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/btnZoom10x"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:background="@drawable/bg_zoom_circle_unselected"
+            android:gravity="center"
+            android:text="10x"
+            android:textColor="@color/white"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+
+    </LinearLayout>
+
     <!-- Manual Controls Panel (Expandable / Tabbed) -->
     <androidx.cardview.widget.CardView
         android:id="@+id/panelManualControls"
@@ -233,7 +347,7 @@
             android:orientation="vertical"
             android:padding="12dp">
 
-            <!-- Sub-Tabs: [ Esposizione | ISO | Fuoco | EV ] -->
+            <!-- Sub-Tabs: [ Esposizione | ISO | Fuoco | EV | Zoom ] -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -245,12 +359,12 @@
                     android:layout_width="0dp"
                     android:layout_height="34dp"
                     android:layout_weight="1"
-                    android:layout_marginEnd="4dp"
+                    android:layout_marginEnd="3dp"
                     android:background="@drawable/bg_chip_selected"
                     android:gravity="center"
                     android:text="Esposizione"
                     android:textColor="@color/black"
-                    android:textSize="12sp"
+                    android:textSize="11sp"
                     android:textStyle="bold" />
 
                 <TextView
@@ -258,12 +372,12 @@
                     android:layout_width="0dp"
                     android:layout_height="34dp"
                     android:layout_weight="1"
-                    android:layout_marginEnd="4dp"
+                    android:layout_marginEnd="3dp"
                     android:background="@drawable/bg_chip_unselected"
                     android:gravity="center"
                     android:text="ISO"
                     android:textColor="@color/white"
-                    android:textSize="12sp"
+                    android:textSize="11sp"
                     android:textStyle="bold" />
 
                 <TextView
@@ -271,12 +385,12 @@
                     android:layout_width="0dp"
                     android:layout_height="34dp"
                     android:layout_weight="1"
-                    android:layout_marginEnd="4dp"
+                    android:layout_marginEnd="3dp"
                     android:background="@drawable/bg_chip_unselected"
                     android:gravity="center"
                     android:text="Fuoco"
                     android:textColor="@color/white"
-                    android:textSize="12sp"
+                    android:textSize="11sp"
                     android:textStyle="bold" />
 
                 <TextView
@@ -284,11 +398,24 @@
                     android:layout_width="0dp"
                     android:layout_height="34dp"
                     android:layout_weight="1"
+                    android:layout_marginEnd="3dp"
                     android:background="@drawable/bg_chip_unselected"
                     android:gravity="center"
                     android:text="EV"
                     android:textColor="@color/white"
-                    android:textSize="12sp"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tabZoom"
+                    android:layout_width="0dp"
+                    android:layout_height="34dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_chip_unselected"
+                    android:gravity="center"
+                    android:text="Zoom"
+                    android:textColor="@color/white"
+                    android:textSize="11sp"
                     android:textStyle="bold" />
             </LinearLayout>
 
@@ -335,7 +462,7 @@
         </LinearLayout>
     </androidx.cardview.widget.CardView>
 
-    <!-- Mode Selector Bar (Astro / Notte / Manuale / Auto) -->
+    <!-- Mode Selector Bar (Foto / Astro / Notte / Manuale) -->
     <HorizontalScrollView
         android:id="@+id/modeChipsScroll"
         android:layout_width="match_parent"
@@ -351,17 +478,31 @@
             android:orientation="horizontal"
             android:gravity="center_vertical">
 
-            <!-- Astro Mode Chip -->
+            <!-- Photo Mode Chip (Default simple camera mode) -->
             <TextView
-                android:id="@+id/chipModeAstro"
+                android:id="@+id/chipModePhoto"
                 android:layout_width="wrap_content"
                 android:layout_height="36dp"
                 android:layout_marginEnd="8dp"
                 android:background="@drawable/bg_chip_selected"
                 android:gravity="center"
                 android:paddingHorizontal="16dp"
-                android:text="🌌 Astro (Stelle)"
+                android:text="📷 Foto"
                 android:textColor="@color/black"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <!-- Astro Mode Chip -->
+            <TextView
+                android:id="@+id/chipModeAstro"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/bg_chip_unselected"
+                android:gravity="center"
+                android:paddingHorizontal="16dp"
+                android:text="🌌 Astro"
+                android:textColor="@color/white"
                 android:textSize="13sp"
                 android:textStyle="bold" />
 
@@ -374,7 +515,21 @@
                 android:background="@drawable/bg_chip_unselected"
                 android:gravity="center"
                 android:paddingHorizontal="16dp"
-                android:text="🌃 Notte Paesaggio"
+                android:text="🌃 Notte"
+                android:textColor="@color/white"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <!-- Star Trails Mode Chip -->
+            <TextView
+                android:id="@+id/chipModeStarTrails"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/bg_chip_unselected"
+                android:gravity="center"
+                android:paddingHorizontal="16dp"
+                android:text="🌠 Scie Stellari"
                 android:textColor="@color/white"
                 android:textSize="13sp"
                 android:textStyle="bold" />
@@ -384,24 +539,10 @@
                 android:id="@+id/chipModePro"
                 android:layout_width="wrap_content"
                 android:layout_height="36dp"
-                android:layout_marginEnd="8dp"
                 android:background="@drawable/bg_chip_unselected"
                 android:gravity="center"
                 android:paddingHorizontal="16dp"
                 android:text="🛠️ Manuale"
-                android:textColor="@color/white"
-                android:textSize="13sp"
-                android:textStyle="bold" />
-
-            <!-- Auto Mode Chip -->
-            <TextView
-                android:id="@+id/chipModeAuto"
-                android:layout_width="wrap_content"
-                android:layout_height="36dp"
-                android:background="@drawable/bg_chip_unselected"
-                android:gravity="center"
-                android:paddingHorizontal="16dp"
-                android:text="🔆 Auto"
                 android:textColor="@color/white"
                 android:textSize="13sp"
                 android:textStyle="bold" />
@@ -491,6 +632,43 @@
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toBottomOf="parent">
 
+        <!-- Top Tripod Progress HUD (Displays countdown when tripod clamp covers bottom screen) -->
+        <LinearLayout
+            android:id="@+id/layoutTopTripodProgress"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="40dp"
+            android:layout_marginHorizontal="20dp"
+            android:background="@drawable/bg_hud_pill"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="10dp"
+            android:visibility="gone"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent">
+
+            <TextView
+                android:id="@+id/tvTopTripodCountdown"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="⏳ 0s / 120s"
+                android:textColor="@color/astro_cyan"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvTopTripodSubframe"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="Integrazione Frame: 1 / 1"
+                android:textColor="@color/astro_amber"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
         <com.google.android.material.progressindicator.CircularProgressIndicator
             android:id="@+id/captureProgressBar"
             android:layout_width="120dp"
@@ -557,21 +735,37 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent" />
 
-        <!-- Stop and Save Stacked Photo Button -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnStopCapture"
+        <!-- Stop and Save Stacked Photo Button & Loading Indicator -->
+        <LinearLayout
             android:layout_width="wrap_content"
-            android:layout_height="48dp"
+            android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
-            android:text="⏹️ Termina e Salva Foto"
-            android:textColor="@color/black"
-            android:textStyle="bold"
-            android:backgroundTint="@color/astro_cyan"
-            app:cornerRadius="24dp"
-            android:visibility="gone"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
             app:layout_constraintTop_toBottomOf="@id/tvCaptureHint"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent" />
+            app:layout_constraintEnd_toEndOf="parent">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnStopCapture"
+                android:layout_width="wrap_content"
+                android:layout_height="48dp"
+                android:text="⏹️ Termina e Salva Foto"
+                android:textColor="@color/black"
+                android:textStyle="bold"
+                android:backgroundTint="@color/astro_cyan"
+                app:cornerRadius="24dp"
+                android:visibility="gone" />
+
+            <ProgressBar
+                android:id="@+id/pbSavingProgress"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_marginStart="12dp"
+                android:indeterminate="true"
+                android:indeterminateTint="@color/astro_cyan"
+                android:visibility="gone" />
+        </LinearLayout>
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 

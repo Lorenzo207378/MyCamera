@@ -46,6 +46,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class AstroCameraController {
 
@@ -54,6 +55,7 @@ public class AstroCameraController {
     public interface CameraEventListener {
         void onCameraReady(CameraCapabilities capabilities);
         void onExposureUpdated(long exposureNs, int iso, float focusDistance);
+        void onZoomUpdated(float currentZoom, float minZoom, float maxZoom);
         void onCaptureStarted(long estimatedDurationMs, int totalFrames);
         void onStackProgress(int currentFrame, int totalFrames, long elapsedMs, long totalMs);
         void onCaptureCompleted(Uri imageUri, Bitmap thumbnail);
@@ -65,11 +67,18 @@ public class AstroCameraController {
         public Range<Long> exposureTimeRange;     // nanoseconds
         public Range<Integer> isoRange;           // ISO values
         public float minFocusDistance;            // diopters (0 = infinity)
+        public Float hyperfocalDistance;
+        public Integer focusCalibration;
+        public Range<Integer> postRawSensitivityBoostRange;
         public Range<Integer> aeCompensationRange;
         public Rational aeCompensationStep;
         public boolean supportsManualSensor;
         public Size previewSize;
         public Size captureSize;
+        public float minZoom = 0.5f;
+        public float maxZoom = 10.0f;
+        public Range<Float> zoomRange;
+        public Rect activeArraySize;
     }
 
     public enum NoiseReductionPreset {
@@ -104,16 +113,26 @@ public class AstroCameraController {
     private CameraCapabilities capabilities;
     private int sensorOrientation = 0;
     private int facing = CameraCharacteristics.LENS_FACING_BACK;
+    private String mainBackCameraId = null;
+    private String ultraWideCameraId = null;
+    private String telephotoCameraId = null;
+    private String frontCameraId = null;
 
-    // Current Manual Parameters (-1 means AUTO)
-    private long manualExposureNs = -1; // nanoseconds (-1 = Auto)
-    private int manualIso = -1;         // (-1 = Auto)
-    private float manualFocusDistance = -1f; // (-1 = Auto Focus, 0.0f = Infinity)
+    // Manual camera parameters
+    private long manualExposureNs = -1; // -1 for Auto, >0 for manual nanoseconds, -2 for Bulb
+    private int manualIso = -1;          // -1 for Auto, >0 for manual ISO
+    private float manualFocusDistance = -1f; // -1 for AF, 0.0f for Infinity, >0 for manual diopters
     private int aeCompensation = 0;
+    private float currentZoom = 1.0f;
+    private final AtomicBoolean isZoomUpdatePending = new AtomicBoolean(false);
+    private final AtomicBoolean isCameraSwitching = new AtomicBoolean(false);
     private FlashMode flashMode = FlashMode.OFF;
     private NoiseReductionPreset noiseReductionPreset = NoiseReductionPreset.HIGH_QUALITY;
     private ImageStacker.StackingMode stackingMode = ImageStacker.StackingMode.DEEP_SKY_INTEGRATION;
     private ImageStacker activeStacker;
+    private boolean isAiDenoiseEnabled = true;
+    private boolean isAiSatelliteFilterEnabled = true;
+    private boolean isAiSkyGroundEnabled = true;
     private int targetFramesCount = 1;
     private int capturedFramesCount = 0;
     private long subFrameExposureNs = 0;
@@ -122,6 +141,7 @@ public class AstroCameraController {
     private long captureStartTimeMs = 0;
     private CaptureRequest.Builder currentCaptureBuilder;
 
+    private TfLiteAstroSegmenter tfLiteSegmenter;
     private boolean isCapturing = false;
 
     public AstroCameraController(Activity activity, AutoFitTextureView textureView, CameraEventListener listener) {
@@ -130,9 +150,11 @@ public class AstroCameraController {
         this.listener = listener;
         this.mainHandler = new Handler(Looper.getMainLooper());
         this.cameraManager = (CameraManager) activity.getSystemService(Context.CAMERA_SERVICE);
+        this.tfLiteSegmenter = new TfLiteAstroSegmenter(activity);
     }
 
     public void startBackgroundThread() {
+        if (backgroundThread != null) return;
         backgroundThread = new HandlerThread("CameraBackground");
         backgroundThread.start();
         backgroundHandler = new Handler(backgroundThread.getLooper());
@@ -142,20 +164,24 @@ public class AstroCameraController {
         if (backgroundThread != null) {
             backgroundThread.quitSafely();
             try {
-                backgroundThread.join();
-                backgroundThread = null;
-                backgroundHandler = null;
+                backgroundThread.join(300);
             } catch (InterruptedException e) {
                 Log.e(TAG, "Error stopping background thread", e);
             }
+            backgroundThread = null;
+            backgroundHandler = null;
         }
     }
 
     public void startCamera() {
         startBackgroundThread();
-        if (textureView.isAvailable()) {
-            openCamera(textureView.getWidth(), textureView.getHeight());
-        } else {
+        if (textureView != null && textureView.isAvailable()) {
+            final int width = textureView.getWidth();
+            final int height = textureView.getHeight();
+            if (backgroundHandler != null) {
+                backgroundHandler.post(() -> openCameraInternal(width, height));
+            }
+        } else if (textureView != null) {
             textureView.setSurfaceTextureListener(surfaceTextureListener);
         }
     }
@@ -163,21 +189,104 @@ public class AstroCameraController {
     public void stopCamera() {
         closeCamera();
         stopBackgroundThread();
+        if (tfLiteSegmenter != null) {
+            tfLiteSegmenter.close();
+            tfLiteSegmenter = null;
+        }
     }
 
     public void switchCamera() {
-        closeCamera();
         facing = (facing == CameraCharacteristics.LENS_FACING_BACK) ?
                 CameraCharacteristics.LENS_FACING_FRONT : CameraCharacteristics.LENS_FACING_BACK;
-        if (textureView.isAvailable()) {
-            openCamera(textureView.getWidth(), textureView.getHeight());
+        this.cameraId = (facing == CameraCharacteristics.LENS_FACING_FRONT && frontCameraId != null) ?
+                frontCameraId : (mainBackCameraId != null ? mainBackCameraId : "0");
+        reopenCamera();
+    }
+
+    public void switchCameraTo(String targetCameraId) {
+        if (targetCameraId == null || targetCameraId.equals(this.cameraId)) return;
+        if (!isCameraSwitching.compareAndSet(false, true)) {
+            return;
+        }
+
+        this.cameraId = targetCameraId;
+        if (backgroundHandler != null) {
+            backgroundHandler.post(() -> {
+                try {
+                    closeCameraInternal();
+                    if (textureView != null && textureView.isAvailable()) {
+                        openCameraInternal(textureView.getWidth(), textureView.getHeight());
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Error switching camera", e);
+                } finally {
+                    isCameraSwitching.set(false);
+                }
+            });
+        } else {
+            isCameraSwitching.set(false);
+        }
+    }
+
+    public void switchToUltraWide() {
+        this.currentZoom = 0.5f;
+        if (facing == CameraCharacteristics.LENS_FACING_BACK && ultraWideCameraId != null && !ultraWideCameraId.equals(this.cameraId)) {
+            switchCameraTo(ultraWideCameraId);
+        } else {
+            setZoom(0.5f);
+        }
+        if (listener != null) {
+            mainHandler.post(() -> listener.onZoomUpdated(0.5f, 0.5f, 10.0f));
+        }
+    }
+
+    public void switchToMainCamera() {
+        if (facing == CameraCharacteristics.LENS_FACING_BACK && mainBackCameraId != null && !mainBackCameraId.equals(this.cameraId)) {
+            switchCameraTo(mainBackCameraId);
+        }
+    }
+
+    private void reopenCamera() {
+        if (textureView != null && textureView.isAvailable()) {
+            if (backgroundHandler != null) {
+                backgroundHandler.post(() -> {
+                    closeCameraInternal();
+                    openCameraInternal(textureView.getWidth(), textureView.getHeight());
+                });
+            }
+        }
+    }
+
+    private void closeCameraInternal() {
+        try {
+            if (captureSession != null) {
+                try { captureSession.close(); } catch (Exception ignored) {}
+                captureSession = null;
+            }
+            if (cameraDevice != null) {
+                try { cameraDevice.close(); } catch (Exception ignored) {}
+                cameraDevice = null;
+            }
+            if (imageReader != null) {
+                try { imageReader.close(); } catch (Exception ignored) {}
+                imageReader = null;
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error in closeCameraInternal", e);
         }
     }
 
     private final TextureView.SurfaceTextureListener surfaceTextureListener = new TextureView.SurfaceTextureListener() {
         @Override
         public void onSurfaceTextureAvailable(@NonNull SurfaceTexture surface, int width, int height) {
-            openCamera(width, height);
+            if (backgroundHandler != null) {
+                backgroundHandler.post(() -> openCameraInternal(width, height));
+            } else {
+                startBackgroundThread();
+                if (backgroundHandler != null) {
+                    backgroundHandler.post(() -> openCameraInternal(width, height));
+                }
+            }
         }
 
         @Override
@@ -196,42 +305,41 @@ public class AstroCameraController {
     };
 
     @SuppressLint("MissingPermission")
-    private void openCamera(int width, int height) {
-        setUpCameraOutputs(width, height);
-        configureTransform(width, height);
-
+    private void openCameraInternal(int width, int height) {
         try {
-            if (!cameraOpenCloseLock.tryAcquire(2500, TimeUnit.MILLISECONDS)) {
-                throw new RuntimeException("Time out waiting to lock camera opening.");
+            if (!cameraOpenCloseLock.tryAcquire(1500, TimeUnit.MILLISECONDS)) {
+                Log.e(TAG, "Time out waiting to lock camera opening.");
+                return;
             }
+
+            setUpCameraOutputs(width, height);
+            activity.runOnUiThread(() -> configureTransform(width, height));
+
             cameraManager.openCamera(cameraId, stateCallback, backgroundHandler);
         } catch (CameraAccessException e) {
+            cameraOpenCloseLock.release();
             Log.e(TAG, "Cannot access the camera", e);
             notifyError("Accesso alla fotocamera fallito: " + e.getMessage());
         } catch (InterruptedException e) {
-            throw new RuntimeException("Interrupted while trying to lock camera opening.", e);
+            cameraOpenCloseLock.release();
+            Log.e(TAG, "Interrupted while trying to lock camera opening.", e);
         } catch (SecurityException e) {
+            cameraOpenCloseLock.release();
             notifyError("Permesso fotocamera non concesso.");
+        } catch (Exception e) {
+            cameraOpenCloseLock.release();
+            Log.e(TAG, "Error opening camera", e);
         }
     }
 
     private void closeCamera() {
         try {
-            cameraOpenCloseLock.acquire();
-            if (captureSession != null) {
-                captureSession.close();
-                captureSession = null;
+            if (!cameraOpenCloseLock.tryAcquire(500, TimeUnit.MILLISECONDS)) {
+                Log.w(TAG, "Timeout locking camera for closing, forcing close");
             }
-            if (cameraDevice != null) {
-                cameraDevice.close();
-                cameraDevice = null;
-            }
-            if (imageReader != null) {
-                imageReader.close();
-                imageReader = null;
-            }
+            closeCameraInternal();
         } catch (InterruptedException e) {
-            throw new RuntimeException("Interrupted while trying to lock camera closing.", e);
+            Log.e(TAG, "Interrupted while closing camera", e);
         } finally {
             cameraOpenCloseLock.release();
         }
@@ -239,64 +347,114 @@ public class AstroCameraController {
 
     private void setUpCameraOutputs(int width, int height) {
         try {
+            float mainFocal = 4.5f;
+            // First pass: identify physical and logical lenses (wide, ultra-wide, tele, front)
             for (String id : cameraManager.getCameraIdList()) {
-                CameraCharacteristics characteristics = cameraManager.getCameraCharacteristics(id);
-                Integer lensFacing = characteristics.get(CameraCharacteristics.LENS_FACING);
-                if (lensFacing != null && lensFacing == facing) {
-                    this.cameraId = id;
-                    this.capabilities = new CameraCapabilities();
+                CameraCharacteristics chars = cameraManager.getCameraCharacteristics(id);
+                Integer lensFacing = chars.get(CameraCharacteristics.LENS_FACING);
+                if (lensFacing == null) continue;
 
-                    sensorOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);
-                    capabilities.exposureTimeRange = characteristics.get(CameraCharacteristics.SENSOR_INFO_EXPOSURE_TIME_RANGE);
-                    capabilities.isoRange = characteristics.get(CameraCharacteristics.SENSOR_INFO_SENSITIVITY_RANGE);
-
-                    Float minFocus = characteristics.get(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE);
-                    capabilities.minFocusDistance = (minFocus != null) ? minFocus : 0f;
-
-                    capabilities.aeCompensationRange = characteristics.get(CameraCharacteristics.CONTROL_AE_COMPENSATION_RANGE);
-                    capabilities.aeCompensationStep = characteristics.get(CameraCharacteristics.CONTROL_AE_COMPENSATION_STEP);
-
-                    int[] caps = characteristics.get(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES);
-                    capabilities.supportsManualSensor = false;
-                    if (caps != null) {
-                        for (int cap : caps) {
-                            if (cap == CameraMetadata.REQUEST_AVAILABLE_CAPABILITIES_MANUAL_SENSOR) {
-                                capabilities.supportsManualSensor = true;
-                                break;
+                if (lensFacing == CameraCharacteristics.LENS_FACING_FRONT) {
+                    if (frontCameraId == null) frontCameraId = id;
+                } else if (lensFacing == CameraCharacteristics.LENS_FACING_BACK) {
+                    if (mainBackCameraId == null) {
+                        mainBackCameraId = id;
+                        float[] fl = chars.get(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS);
+                        if (fl != null && fl.length > 0) mainFocal = fl[0];
+                    } else {
+                        float[] fl = chars.get(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS);
+                        if (fl != null && fl.length > 0) {
+                            if (fl[0] < mainFocal || fl[0] < 3.5f) {
+                                ultraWideCameraId = id;
+                            } else if (fl[0] > 6.0f) {
+                                telephotoCameraId = id;
                             }
                         }
                     }
-
-                    StreamConfigurationMap map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
-                    if (map == null) continue;
-
-                    // Choose largest JPEG size for pristine night shots
-                    Size largest = Collections.max(
-                            Arrays.asList(map.getOutputSizes(ImageFormat.JPEG)),
-                            new CompareSizesByArea()
-                    );
-                    capabilities.captureSize = largest;
-
-                    imageReader = ImageReader.newInstance(largest.getWidth(), largest.getHeight(), ImageFormat.JPEG, 2);
-                    imageReader.setOnImageAvailableListener(onImageAvailableListener, backgroundHandler);
-
-                    // Choose optimal preview size
-                    Size optimalPreviewSize = chooseOptimalSize(
-                            map.getOutputSizes(SurfaceTexture.class),
-                            width, height, largest
-                    );
-                    capabilities.previewSize = optimalPreviewSize;
-
-                    activity.runOnUiThread(() -> {
-                        textureView.setAspectRatio(optimalPreviewSize.getHeight(), optimalPreviewSize.getWidth());
-                        if (listener != null) {
-                            listener.onCameraReady(capabilities);
-                        }
-                    });
-
-                    return;
                 }
             }
+
+            // Select active camera ID based on facing and current zoom
+            if (this.cameraId == null) {
+                if (facing == CameraCharacteristics.LENS_FACING_FRONT) {
+                    this.cameraId = (frontCameraId != null) ? frontCameraId : "1";
+                } else {
+                    if (currentZoom <= 0.6f && ultraWideCameraId != null) {
+                        this.cameraId = ultraWideCameraId;
+                    } else {
+                        this.cameraId = (mainBackCameraId != null) ? mainBackCameraId : "0";
+                    }
+                }
+            }
+
+            CameraCharacteristics characteristics = cameraManager.getCameraCharacteristics(this.cameraId);
+            this.capabilities = new CameraCapabilities();
+
+            sensorOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);
+            capabilities.exposureTimeRange = characteristics.get(CameraCharacteristics.SENSOR_INFO_EXPOSURE_TIME_RANGE);
+            capabilities.isoRange = characteristics.get(CameraCharacteristics.SENSOR_INFO_SENSITIVITY_RANGE);
+
+            Float minFocus = characteristics.get(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE);
+            capabilities.minFocusDistance = (minFocus != null) ? minFocus : 0f;
+            capabilities.hyperfocalDistance = characteristics.get(CameraCharacteristics.LENS_INFO_HYPERFOCAL_DISTANCE);
+            capabilities.focusCalibration = characteristics.get(CameraCharacteristics.LENS_INFO_FOCUS_DISTANCE_CALIBRATION);
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+                capabilities.postRawSensitivityBoostRange = characteristics.get(CameraCharacteristics.CONTROL_POST_RAW_SENSITIVITY_BOOST_RANGE);
+            }
+
+            capabilities.aeCompensationRange = characteristics.get(CameraCharacteristics.CONTROL_AE_COMPENSATION_RANGE);
+            capabilities.aeCompensationStep = characteristics.get(CameraCharacteristics.CONTROL_AE_COMPENSATION_STEP);
+
+            int[] caps = characteristics.get(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES);
+            capabilities.supportsManualSensor = false;
+            if (caps != null) {
+                for (int cap : caps) {
+                    if (cap == CameraMetadata.REQUEST_AVAILABLE_CAPABILITIES_MANUAL_SENSOR) {
+                        capabilities.supportsManualSensor = true;
+                        break;
+                    }
+                }
+            }
+
+            Rect activeArray = characteristics.get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE);
+            capabilities.activeArraySize = activeArray;
+            capabilities.minZoom = 0.5f;
+            capabilities.maxZoom = 10.0f;
+
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                capabilities.zoomRange = characteristics.get(CameraCharacteristics.CONTROL_ZOOM_RATIO_RANGE);
+                if (capabilities.zoomRange != null) {
+                    capabilities.minZoom = capabilities.zoomRange.getLower();
+                    capabilities.maxZoom = capabilities.zoomRange.getUpper();
+                }
+            }
+
+            StreamConfigurationMap map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
+            if (map == null) return;
+
+            // Choose largest JPEG size for pristine night shots
+            Size largest = Collections.max(
+                    Arrays.asList(map.getOutputSizes(ImageFormat.JPEG)),
+                    new CompareSizesByArea()
+            );
+            capabilities.captureSize = largest;
+
+            imageReader = ImageReader.newInstance(largest.getWidth(), largest.getHeight(), ImageFormat.JPEG, 2);
+            imageReader.setOnImageAvailableListener(onImageAvailableListener, backgroundHandler);
+
+            // Choose optimal preview size
+            Size optimalPreviewSize = chooseOptimalSize(
+                    map.getOutputSizes(SurfaceTexture.class),
+                    width, height, largest
+            );
+            capabilities.previewSize = optimalPreviewSize;
+
+            activity.runOnUiThread(() -> {
+                textureView.setAspectRatio(optimalPreviewSize.getHeight(), optimalPreviewSize.getWidth());
+                if (listener != null) {
+                    listener.onCameraReady(capabilities);
+                }
+            });
         } catch (CameraAccessException e) {
             Log.e(TAG, "Error setting up camera outputs", e);
         }
@@ -306,34 +464,54 @@ public class AstroCameraController {
         @Override
         public void onOpened(@NonNull CameraDevice camera) {
             cameraOpenCloseLock.release();
+            if (cameraDevice != null && cameraDevice != camera) {
+                try {
+                    cameraDevice.close();
+                } catch (Exception ignored) {}
+            }
             cameraDevice = camera;
-            createCameraPreviewSession();
+            try {
+                createCameraPreviewSession();
+            } catch (Exception e) {
+                Log.e(TAG, "Error creating preview session in onOpened", e);
+            }
         }
 
         @Override
         public void onDisconnected(@NonNull CameraDevice camera) {
             cameraOpenCloseLock.release();
-            camera.close();
-            cameraDevice = null;
+            try {
+                camera.close();
+            } catch (Exception ignored) {}
+            if (cameraDevice == camera) {
+                cameraDevice = null;
+            }
         }
 
         @Override
         public void onError(@NonNull CameraDevice camera, int error) {
             cameraOpenCloseLock.release();
-            camera.close();
-            cameraDevice = null;
-            notifyError("Errore hardware fotocamera: " + error);
+            try {
+                camera.close();
+            } catch (Exception ignored) {}
+            if (cameraDevice == camera) {
+                cameraDevice = null;
+            }
+            Log.e(TAG, "Hardware camera error code: " + error);
         }
     };
 
     private void createCameraPreviewSession() {
+        if (cameraDevice == null || textureView == null || !textureView.isAvailable()) return;
+
         try {
             SurfaceTexture texture = textureView.getSurfaceTexture();
-            if (texture == null) return;
+            if (texture == null || capabilities == null || capabilities.previewSize == null) return;
 
             texture.setDefaultBufferSize(capabilities.previewSize.getWidth(), capabilities.previewSize.getHeight());
             Surface surface = new Surface(texture);
 
+            if (cameraDevice == null) return;
             previewRequestBuilder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
             previewRequestBuilder.addTarget(surface);
 
@@ -342,19 +520,30 @@ public class AstroCameraController {
                     new CameraCaptureSession.StateCallback() {
                         @Override
                         public void onConfigured(@NonNull CameraCaptureSession session) {
-                            if (cameraDevice == null) return;
+                            if (cameraDevice == null) {
+                                try { session.close(); } catch (Exception ignored) {}
+                                return;
+                            }
                             captureSession = session;
                             updatePreviewSettings();
                         }
 
                         @Override
                         public void onConfigureFailed(@NonNull CameraCaptureSession session) {
+                            try { session.close(); } catch (Exception ignored) {}
                             notifyError("Configurazione sessione fotocamera fallita.");
+                        }
+
+                        @Override
+                        public void onClosed(@NonNull CameraCaptureSession session) {
+                            if (captureSession == session) {
+                                captureSession = null;
+                            }
                         }
                     },
                     backgroundHandler
             );
-        } catch (CameraAccessException e) {
+        } catch (Exception e) {
             Log.e(TAG, "Error creating preview session", e);
         }
     }
@@ -392,6 +581,9 @@ public class AstroCameraController {
             } else {
                 previewRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
             }
+
+            // Apply Zoom (0.5x to maxZoom)
+            applyZoom(previewRequestBuilder);
 
             previewRequest = previewRequestBuilder.build();
             captureSession.setRepeatingRequest(previewRequest, previewCaptureCallback, backgroundHandler);
@@ -465,37 +657,51 @@ public class AstroCameraController {
             totalRequestedExposureNs = manualExposureNs;
 
             // Determine maximum sensor hardware exposure
-            long maxSensorNs = 15_000_000_000L; // 15s default fallback
+            long maxSensorNs = 10_000_000_000L; // 10s fallback
             if (capabilities != null && capabilities.exposureTimeRange != null) {
                 maxSensorNs = capabilities.exposureTimeRange.getUpper();
             }
 
-            if (manualExposureNs <= 0) {
+            if (stackingMode == ImageStacker.StackingMode.STAR_TRAILS) {
+                // Star Trails: 25s sub-frames are the astrophotography standard.
+                // Shorter than 10s → too many inter-frame gaps; longer → dark current accumulates.
+                // 25s prevents sky background saturation in light-polluted areas while keeping
+                // continuous star trails without visible gaps between arcs (standard: 15–30s).
+                subFrameExposureNs = Math.min(maxSensorNs, 25_000_000_000L);
+                targetFramesCount = -1; // Continuous until duration ends
+                totalRequestedExposureNs = (manualExposureNs == -2L) ? -2L : ((manualExposureNs > 0) ? manualExposureNs : 1_800_000_000_000L);
+            } else if (manualExposureNs <= 0) {
                 // Auto single capture
                 targetFramesCount = 1;
                 subFrameExposureNs = -1;
+                totalRequestedExposureNs = 0;
             } else if (manualExposureNs == -2L) {
                 // Bulb mode: continuous stacking until stopped
-                subFrameExposureNs = Math.min(maxSensorNs, 15_000_000_000L);
-                targetFramesCount = 9999;
+                subFrameExposureNs = Math.min(maxSensorNs, 10_000_000_000L);
+                targetFramesCount = -1;
+                totalRequestedExposureNs = -2L;
             } else if (manualExposureNs <= maxSensorNs) {
                 // Single native long exposure
                 targetFramesCount = 1;
                 subFrameExposureNs = manualExposureNs;
+                totalRequestedExposureNs = manualExposureNs;
             } else {
-                // Multi-frame Astro Stacking (e.g. 60s, 120s, 180s, 300s)
-                subFrameExposureNs = Math.min(maxSensorNs, 15_000_000_000L);
-                targetFramesCount = (int) Math.ceil((double) manualExposureNs / subFrameExposureNs);
+                // Multi-frame Astro Stacking (e.g. 60s, 120s, 180s, 240s, 300s): Continuous time-driven integration!
+                subFrameExposureNs = Math.min(maxSensorNs, 10_000_000_000L);
+                targetFramesCount = -1; // Continuous time-based stacking
+                totalRequestedExposureNs = manualExposureNs;
             }
 
-            activeStacker = new ImageStacker(stackingMode, targetFramesCount);
+            activeStacker = new ImageStacker(stackingMode);
+            activeStacker.setAiOptions(isAiDenoiseEnabled, isAiSatelliteFilterEnabled, isAiSkyGroundEnabled);
+            activeStacker.setTfLiteSegmenter(tfLiteSegmenter);
             captureStartTimeMs = System.currentTimeMillis();
 
             long totalEstimatedDurationMs;
-            if (targetFramesCount == 9999) {
+            if (totalRequestedExposureNs == -2L) {
                 totalEstimatedDurationMs = 0; // Bulb
-            } else if (subFrameExposureNs > 0) {
-                totalEstimatedDurationMs = targetFramesCount * (subFrameExposureNs / 1_000_000L);
+            } else if (totalRequestedExposureNs > 0) {
+                totalEstimatedDurationMs = totalRequestedExposureNs / 1_000_000L;
             } else {
                 totalEstimatedDurationMs = 500L;
             }
@@ -521,24 +727,39 @@ public class AstroCameraController {
             currentCaptureBuilder.set(CaptureRequest.JPEG_ORIENTATION, jpegOrientation);
 
             if (subFrameExposureNs > 0) {
-                int effectiveIso = (manualIso > 0) ? manualIso : 1600;
+                int effectiveIso;
+                if (manualIso > 0) {
+                    effectiveIso = manualIso;
+                } else {
+                    int maxIso = (capabilities != null && capabilities.isoRange != null) ? capabilities.isoRange.getUpper() : 3200;
+                    effectiveIso = Math.min(maxIso, 3200);
+                }
                 currentCaptureBuilder.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO);
                 currentCaptureBuilder.set(CaptureRequest.CONTROL_AE_MODE, CameraMetadata.CONTROL_AE_MODE_OFF);
                 currentCaptureBuilder.set(CaptureRequest.SENSOR_EXPOSURE_TIME, subFrameExposureNs);
                 currentCaptureBuilder.set(CaptureRequest.SENSOR_FRAME_DURATION, subFrameExposureNs);
                 currentCaptureBuilder.set(CaptureRequest.SENSOR_SENSITIVITY, effectiveIso);
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N && capabilities != null && capabilities.postRawSensitivityBoostRange != null) {
+                    currentCaptureBuilder.set(CaptureRequest.CONTROL_POST_RAW_SENSITIVITY_BOOST, capabilities.postRawSensitivityBoostRange.getUpper());
+                }
                 Log.i(TAG, "Impostato scatto manuale: Esposizione=" + (subFrameExposureNs / 1_000_000_000.0) + "s, ISO=" + effectiveIso);
             } else {
                 currentCaptureBuilder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON);
                 currentCaptureBuilder.set(CaptureRequest.CONTROL_AE_EXPOSURE_COMPENSATION, aeCompensation);
             }
 
+            float effectiveFocus;
             if (manualFocusDistance >= 0f) {
-                currentCaptureBuilder.set(CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_OFF);
-                currentCaptureBuilder.set(CaptureRequest.LENS_FOCUS_DISTANCE, manualFocusDistance);
+                effectiveFocus = manualFocusDistance;
             } else {
-                currentCaptureBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
+                effectiveFocus = getOptimalAstroFocusDistance();
             }
+
+            currentCaptureBuilder.set(CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_OFF);
+            currentCaptureBuilder.set(CaptureRequest.LENS_FOCUS_DISTANCE, effectiveFocus);
+
+            // Apply Zoom to still capture
+            applyZoom(currentCaptureBuilder);
 
             triggerNextSubFrame();
 
@@ -644,15 +865,17 @@ public class AstroCameraController {
                 capturedFramesCount++;
 
                 long elapsedMs = System.currentTimeMillis() - captureStartTimeMs;
-                long totalMs = (targetFramesCount == 9999) ? 0 : (targetFramesCount * (subFrameExposureNs / 1_000_000L));
+                long totalMs = (totalRequestedExposureNs == -2L) ? 0 :
+                        (totalRequestedExposureNs > 0 ? (totalRequestedExposureNs / 1_000_000L) : 0);
+                boolean timeExpired = (totalMs > 0 && elapsedMs >= totalMs);
 
                 mainHandler.post(() -> {
                     if (listener != null) {
-                        listener.onStackProgress(capturedFramesCount, targetFramesCount, elapsedMs, totalMs);
+                        listener.onStackProgress(capturedFramesCount, -1, elapsedMs, totalMs);
                     }
                 });
 
-                if (capturedFramesCount < targetFramesCount && !cancelOrFinishEarly) {
+                if (!cancelOrFinishEarly && !timeExpired) {
                     triggerNextSubFrame();
                 } else {
                     finishAndSaveStack();
@@ -805,6 +1028,12 @@ public class AstroCameraController {
         updatePreviewSettings();
     }
 
+    public void setAiOptions(boolean denoise, boolean satelliteFilter, boolean skyGround) {
+        this.isAiDenoiseEnabled = denoise;
+        this.isAiSatelliteFilterEnabled = satelliteFilter;
+        this.isAiSkyGroundEnabled = skyGround;
+    }
+
     public CameraCapabilities getCapabilities() {
         return capabilities;
     }
@@ -819,6 +1048,15 @@ public class AstroCameraController {
 
     public float getManualFocusDistance() {
         return manualFocusDistance;
+    }
+
+    public float getOptimalAstroFocusDistance() {
+        if (capabilities == null) return 0.0f;
+        // 0.0f diopters is optical infinity (1 / infinity = 0)
+        if (capabilities.hyperfocalDistance != null && capabilities.hyperfocalDistance > 0f && capabilities.hyperfocalDistance <= 0.05f) {
+            return capabilities.hyperfocalDistance;
+        }
+        return 0.0f;
     }
 
     public FlashMode getFlashMode() {
@@ -904,5 +1142,90 @@ public class AstroCameraController {
             return Long.signum((long) lhs.getWidth() * lhs.getHeight() -
                     (long) rhs.getWidth() * rhs.getHeight());
         }
+    }
+
+    /**
+     * Applies optical/digital zoom to capture request builder (0.5x to 10.0x).
+     */
+    private void applyZoom(CaptureRequest.Builder builder) {
+        if (builder == null || capabilities == null) return;
+
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R && capabilities.zoomRange != null) {
+                float clamped = Math.max(capabilities.zoomRange.getLower(), Math.min(currentZoom, capabilities.zoomRange.getUpper()));
+                builder.set(CaptureRequest.CONTROL_ZOOM_RATIO, clamped);
+            } else if (capabilities.activeArraySize != null) {
+                float effectiveZoom = Math.max(1.0f, Math.min(currentZoom, capabilities.maxZoom));
+                applyCropRegionZoom(builder, capabilities.activeArraySize, effectiveZoom);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error applying zoom", e);
+        }
+    }
+
+    private void applyCropRegionZoom(CaptureRequest.Builder builder, Rect activeArray, float zoomFactor) {
+        if (builder == null || activeArray == null || zoomFactor <= 0f) return;
+
+        int fullW = activeArray.width();
+        int fullH = activeArray.height();
+        if (fullW <= 0 || fullH <= 0) return;
+
+        int cropW = Math.max(160, Math.min(fullW, (int) (fullW / zoomFactor)));
+        int cropH = Math.max(160, Math.min(fullH, (int) (fullH / zoomFactor)));
+
+        int cropX = activeArray.left + (fullW - cropW) / 2;
+        int cropY = activeArray.top + (fullH - cropH) / 2;
+        Rect cropRect = new Rect(cropX, cropY, cropX + cropW, cropY + cropH);
+        builder.set(CaptureRequest.SCALER_CROP_REGION, cropRect);
+    }
+
+    /**
+     * Sets zoom level with smooth preview update and listener callback.
+     */
+    public void setZoom(float zoomRatio) {
+        float min = 0.5f;
+        float max = 10.0f;
+        this.currentZoom = Math.max(min, Math.min(zoomRatio, max));
+
+        // Auto-switch between Ultra-Wide camera ID and Main Back camera ID if they are separate physical cameras
+        if (facing == CameraCharacteristics.LENS_FACING_BACK) {
+            if (currentZoom <= 0.6f && ultraWideCameraId != null && !ultraWideCameraId.equals(cameraId)) {
+                switchCameraTo(ultraWideCameraId);
+            } else if (currentZoom >= 0.8f && ultraWideCameraId != null && ultraWideCameraId.equals(cameraId) && mainBackCameraId != null) {
+                switchCameraTo(mainBackCameraId);
+            }
+        }
+
+        // Notify UI immediately so badge and HUD update at full 60/120fps with zero latency
+        if (listener != null) {
+            mainHandler.post(() -> listener.onZoomUpdated(currentZoom, min, max));
+        }
+
+        // Rate-limit request to backgroundHandler to prevent Camera2 HAL message queue congestion
+        if (isZoomUpdatePending.compareAndSet(false, true)) {
+            backgroundHandler.post(() -> {
+                isZoomUpdatePending.set(false);
+                if (captureSession != null && previewRequestBuilder != null && cameraDevice != null) {
+                    try {
+                        applyZoom(previewRequestBuilder);
+                        captureSession.setRepeatingRequest(previewRequestBuilder.build(), previewCaptureCallback, backgroundHandler);
+                    } catch (Exception e) {
+                        Log.e(TAG, "Error updating zoom on session", e);
+                    }
+                }
+            });
+        }
+    }
+
+    public float getCurrentZoom() {
+        return currentZoom;
+    }
+
+    public float getMinZoom() {
+        return 0.5f;
+    }
+
+    public float getMaxZoom() {
+        return 10.0f;
     }
 }

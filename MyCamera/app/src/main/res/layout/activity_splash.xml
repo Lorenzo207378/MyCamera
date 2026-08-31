@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/layoutSplashRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/bg_splash"
+    tools:context=".SplashActivity">
+
+    <!-- Center Content: Logo, Title, Subtitle -->
+    <LinearLayout
+        android:id="@+id/layoutCenterBrand"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintVertical_bias="0.45">
+
+        <!-- Outer Glowing Ring -->
+        <FrameLayout
+            android:layout_width="144dp"
+            android:layout_height="144dp"
+            android:background="@drawable/bg_logo_circle_glow"
+            android:padding="8dp">
+
+            <!-- Logo Card with Telescope & Stars -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                app:cardCornerRadius="64dp"
+                app:cardElevation="12dp"
+                app:strokeWidth="1.5dp"
+                app:strokeColor="@color/astro_cyan"
+                app:cardBackgroundColor="@color/black">
+
+                <ImageView
+                    android:id="@+id/ivSplashLogo"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="centerCrop"
+                    android:src="@drawable/ic_app_logo"
+                    android:contentDescription="@string/app_name" />
+
+            </com.google.android.material.card.MaterialCardView>
+        </FrameLayout>
+
+        <!-- App Name with Glowing Cyan Accent -->
+        <TextView
+            android:id="@+id/tvSplashTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="@string/app_name"
+            android:textColor="@color/white"
+            android:textSize="28sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.04" />
+
+        <!-- Tagline -->
+        <TextView
+            android:id="@+id/tvSplashTagline"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="Fotografia Notturna &amp; Astronomica"
+            android:textColor="@color/astro_cyan"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.06" />
+
+        <!-- Highlights pill badges -->
+        <TextView
+            android:id="@+id/tvSplashFeatures"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:text="🌌 Deep Sky • 🌠 Star Trails • ⏱ 3+ Min • 🎯 ∞ Focus"
+            android:textColor="@color/text_secondary"
+            android:textSize="11sp" />
+
+    </LinearLayout>
+
+    <!-- Bottom Loading Section -->
+    <LinearLayout
+        android:id="@+id/layoutSplashBottom"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="48dp"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <com.google.android.material.progressindicator.CircularProgressIndicator
+            android:id="@+id/splashProgress"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:indeterminate="true"
+            app:indicatorColor="@color/astro_cyan"
+            app:indicatorSize="24dp"
+            app:trackColor="#2000E5FF"
+            app:trackThickness="2.5dp" />
+
+        <TextView
+            android:id="@+id/tvSplashStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="Inizializzazione sensore Camera2…"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp" />
+
+    </LinearLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>
